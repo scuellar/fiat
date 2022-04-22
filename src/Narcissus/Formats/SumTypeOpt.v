@@ -23,6 +23,8 @@ Section SumType.
     : CacheFormat -> Comp (B * CacheFormat) :=
     ith formatrs (SumType_index types st) (SumType_proj types st).
 
+  
+  
   Definition encode_SumType {m}
              (types : Vector.t Type m)
              (formatrs : ilist (B := fun T => T -> CacheFormat -> (B * CacheFormat)) types)

@@ -198,7 +198,7 @@ Ltac apply_combinator_rule'
                    (formatrs := formatrs')
                    (decoders := decoders')
                    (invariants := invariants')
-                   (invariants_rest := invariants_rest')
+                   (invariants_rest := invariants_rest') (*TODO : ^ The lemma has no variable with this name *)
                    (cache_invariants :=  cache_invariants')
               ))))); apply_rules
       | ilist_of_evar
@@ -220,7 +220,7 @@ Ltac apply_combinator_rule'
                              (formatrs := formatrs')
                              (decoders := decoders')
                              (invariants := invariants')
-                             (invariants_rest := invariants_rest')
+                             (invariants_rest := invariants_rest')(*TODO : ^ The lemma has no variable with this name *)
                              (cache_invariants :=  cache_invariants'))))))
       ];
     [ simpl; repeat (apply IterateBoundedIndex.Build_prim_and; intros); try exact I;

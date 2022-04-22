@@ -649,6 +649,36 @@ Add Parametric Morphism
     S T V
     (cache : Cache)
     (monoid : Monoid T)
+    (decode_inv : CacheDecode -> Prop)
+    Source_Predicate
+    view
+    format
+    decode
+    view_format
+  : (fun View_Predicate  =>
+       @CorrectDecoder S T cache V monoid Source_Predicate View_Predicate
+                       view format decode decode_inv view_format)
+    with signature (pointwise_relation _ impl
+                                       ==> impl)
+      as weaken_view_predicate.
+Proof.
+  unfold EquivFormat, impl, pointwise_relation, CorrectDecoder; intros.
+  rename x into view_pred1.
+  rename y into view_pred2.
+  destruct H0.
+  split; try solve
+             [intuition eauto; intros].
+  clear H0.
+  split; try (eapply H1; eauto).
+  edestruct H1 as [? (?&?&?&?&?&?)]; eauto.
+  intuition eauto; intros.
+  repeat (econstructor; eauto).
+Qed.
+
+Add Parametric Morphism
+    S T V
+    (cache : Cache)
+    (monoid : Monoid T)
     (Source_Predicate : S -> Prop)
     (View_Predicate : V -> Prop)
     view

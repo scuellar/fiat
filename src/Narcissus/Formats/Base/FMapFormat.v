@@ -60,7 +60,7 @@ Section ComposeFormat.
              forall x env benv,
                format x env ∋ benv
                -> f s x
-               -> format s' env ∋ benv)
+               -> exists benv', format s' env ∋ benv')
     : CorrectEncoder format encode
       -> CorrectEncoder (Compose_Format format f) (Compose_Encode encode f').
   Proof.
@@ -69,9 +69,10 @@ Section ComposeFormat.
       destruct (f' a) eqn: ?; simpl in *; try discriminate.
       eapply H in H0; eexists; intuition eauto.
     - rewrite unfold_computes; intro;  destruct_ex; split_and.
-      destruct (f' a) eqn: ?; simpl in *; try discriminate.
-      eapply H4; eauto.
-      eapply f'_refines_f_2; eauto.
+      destruct (f' a) eqn: ?; simpl in *.
+      + edestruct f'_sound_choice as ((?&?)&?); eauto.
+        eapply H4; eauto.
+      + eapply f'_refines_f_2; eauto.
   Qed.
 
 End ComposeFormat.
