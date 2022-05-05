@@ -53,6 +53,7 @@ Ltac align_decoders_step :=
       end
     | eapply @AlignedDecodeDelimiterSimpleM; intros
     | eapply @AlignedDecodeNatM; intros
+    | eapply AlignedDecodeStringTermCharM; intros; eauto         
     | eapply @AlignedDecodeByteBufferM; intros; eauto
     | eapply @AlignedDecodeBind2CharM; intros; eauto
     | eapply @AlignedDecodeBindCharM; intros; eauto
@@ -654,6 +655,7 @@ Ltac align_encoder_step :=
   | eapply CorrectAlignedEncoderForFormatVector; unshelve (instantiate (1 := _));
     eauto using encoder_empty_cache_OK
   | apply CorrectAlignedEncoderForFormatChar; eauto
+  | apply CorrectAlignedEncoderFormatStringTerm; auto
   | apply CorrectAlignedEncoderForFormatNat
   | apply CorrectAlignedEncoderForFormat2Nat; eauto
   | apply CorrectAlignedEncoderForFormatEnum
