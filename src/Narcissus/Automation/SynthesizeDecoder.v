@@ -1,3 +1,4 @@
+Require Import Coq.Strings.String.
 Require Import
         Coq.Bool.Bool
         Coq.Strings.String
@@ -39,7 +40,6 @@ Require Import
         Fiat.Narcissus.Automation.Common
         Fiat.Narcissus.Automation.ExtractData.
 
-
 Require
         (*This library should probably go in the Binlib folder *)
 (*           ... But there are circularity problems *)
@@ -78,6 +78,57 @@ Ltac solve_data_inv :=
     solve [intuition eauto 3 with data_inv_hints]
     | shelve_inv ].
 
+Lemma list_ascii_of_string_app : forall s1 s2,
+    (list_ascii_of_string (s1 ++ s2))%string =
+    ((list_ascii_of_string s1) ++ (list_ascii_of_string s2))%list.
+Proof.
+  intros.
+  induction s1; auto.
+  intros.
+  simpl.
+  f_equal.
+  rewrite IHs1; auto.
+Qed.
+
+Lemma string_eq_In_list :
+  forall s s1 s2 a,
+    s = (s1 ++ String a s2)%string ->
+    In a (list_ascii_of_string s).
+Proof.
+  intros.
+  rewrite H.
+  clear H.
+  rewrite list_ascii_of_string_app.
+  apply in_or_app.               
+  right; simpl; auto.
+Qed.
+
+Ltac solve_term_char_not_in_sub :=
+  match goal with
+  | [H : In _ (list_ascii_of_string _) |- _ ] =>
+    simpl in H; solve_term_char_not_in_sub
+  | [H : _ = _ |- _ ] =>
+    inversion H; solve_term_char_not_in_sub
+  | [ H : _ \/ _ |- _ ] =>
+    destruct H; solve_term_char_not_in_sub
+  | [ H : False |- _ ]  => exact H
+  | |- _ => fail
+  end.
+
+Ltac solve_term_char_not_in :=
+  repeat
+    match goal with
+    | |- context[Vector.nth _ _ <> _] =>
+      intros; simpl; apply forall_Vector_P
+    | |- context[Vector.Forall _] =>
+      constructor
+    | |- context[_ <> _] =>
+      intros; intros Hnot;
+        apply string_eq_In_list in Hnot;
+        clear -Hnot;
+        solve solve_term_char_not_in_sub
+    end.
+
 Ltac solve_side_condition :=
   (* Try to discharge a side condition of one of the base rules *)
   match goal with
@@ -86,6 +137,8 @@ Ltac solve_side_condition :=
     let a'' := fresh in
     intro a''; intros; repeat instantiate (1 := fun _ _ => True);
     repeat destruct a'' as [ ? | a''] ; auto
+  | |- context[Vector.nth _ _ <> _] =>
+    try intros; simpl; solve_term_char_not_in; auto
   | _ => solve [solve_data_inv]
   | _ => solve [intros; instantiate (1 := fun _ _ => True); exact I]
   end.
@@ -122,6 +175,12 @@ Ltac apply_base_rule :=
   |- context[CorrectDecoder _ _ _ _ StringOpt.format_string _ _ _ ] =>
     first [ solve [eapply (StringOpt.String_decode_correct _ H)]
           | throw "Could not synthesize decoder for string."%string ]
+
+  (* Terminated Strings *)
+  | H : cache_inv_Property _ _
+    |- context[CorrectDecoder _ _ _ _ (format_string_with_term_char _) _ _ ] =>
+    intros;
+    eapply String_decode_with_term_char_correct; eauto
 
   (* Enumerated Types *)
   | H : cache_inv_Property _ _
