@@ -203,6 +203,10 @@ Ltac apply_base_rule :=
           | solve [intros; intuition eauto]
           | throw "Could not synthesize decoder for byte buffer."%string ]
 
+  | H : cache_inv_Property ?mnd _
+    |- CorrectDecoder _ _ _ _ ?format _ _ _ =>
+    unfold format; apply_base_rule
+
   (* Hook for new base rules. *)
   | |- _ => apply_new_base_rule
   end.
