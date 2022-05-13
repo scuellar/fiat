@@ -38,8 +38,7 @@ Require Import
         Fiat.Narcissus.Automation.NormalizeFormats
         Fiat.Narcissus.Automation.Decision
         Fiat.Narcissus.Automation.Common
-        Fiat.Narcissus.Automation.ExtractData
-        Fiat.Narcissus.Automation.NormalizeFormats.
+        Fiat.Narcissus.Automation.ExtractData.
 
 Require
         (*This library should probably go in the Binlib folder *)
@@ -249,7 +248,7 @@ Ltac apply_combinator_rule'
 
   | |- context [CorrectDecoder _ _ _ _ (format_list _) _ _ _] =>
     intros; apply FixList_decode_correct;
-    normalize_format; apply_rules
+    apply_rules
 
   (* Delimiter *)
   (* TODO: performance optimization: don't go to the second delimiter case if
