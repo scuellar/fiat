@@ -49,7 +49,7 @@ Ltac align_decoders_step :=
             try (instantiate (1 := ilist.icons _ _); simpl; intros; higher_order_reflexivity)]
         | try exact I]
       | |- context [ decode_string_with_term_char ?term_char _ _] =>
-        eapply @AlignedDecodeStringTermCharM; intros; eauto
+      eapply (fun H H' => @AlignedDecodeStringTermCharM _ _ H H' _ (NToWord 8 (Ascii.N_of_ascii term_char))); intros; eauto
       end
     | eapply @AlignedDecodeDelimiterSimpleM; intros
     | eapply @AlignedDecodeNatM; intros
@@ -654,22 +654,14 @@ Ltac align_encoder_step :=
   | eapply CorrectAlignedEncoderForFormatVector; unshelve (instantiate (1 := _));
     eauto using encoder_empty_cache_OK
   | apply CorrectAlignedEncoderForFormatChar; eauto
-  | apply CorrectAlignedEncoderFormatStringTerm; auto
   | apply CorrectAlignedEncoderForFormatNat
   | apply CorrectAlignedEncoderForFormat2Nat; eauto
   | apply CorrectAlignedEncoderForFormatEnum
   | eapply CorrectAlignedEncoderForFormatSumType; eauto
   | eapply CorrectAlignedEncoderForFormatByteBuffer; eauto using encoder_empty_cache_OK
   | eapply CorrectAlignedEncoderProjection
-  | intros;
-    match goal with
-    | |- CorrectAlignedEncoder (format_enum (sz:=?bsz) _) _ =>
-      let csz := eval compute in (bsz / 8) in
-          apply (fun H H' => CorrectAlignedEncoderForFormatNEnum H H' csz); eauto
-
-      (* let csz := eval compute in (N.div (N.of_nat bsz) (N.of_nat 8)) in *)
-      (*     apply (fun H H' => CorrectAlignedEncoderForFormatNEnum H H' (N.to_nat csz)); eauto *)
-    end
+  | eapply (fun H H' => CorrectAlignedEncoderForFormatNEnum H H' 2); [ solve [ eauto ] | solve [ eauto ] ]
+  | eapply (fun H H' => CorrectAlignedEncoderForFormatNEnum H H' 3); [ solve [ eauto ] | solve [ eauto ] ]
   | eapply CorrectAlignedEncoderForFormatUnusedWord
   | eapply CorrectAlignedEncoderForFormatOption
   | intros; try collapse_unaligned_words; eapply CorrectAlignedEncoderProjection; (solve
@@ -678,10 +670,8 @@ Ltac align_encoder_step :=
     match goal with
     | |- CorrectAlignedEncoder (format_word (sz:=?bsz)) _ =>
         (* Probably should check if [bsz] is closed. *)
-      let csz := eval compute in (bsz / 8) in
+        let csz := eval compute in (bsz / 8) in
         eapply CorrectAlignedEncoderForFormatNChar with (sz := csz); eauto
-      (* let csz := eval compute in (N.div (N.of_nat bsz) (N.of_nat 8)) in *)
-      (*   eapply CorrectAlignedEncoderForFormatNChar with (sz := (N.to_nat csz)); eauto *)
     end
   | match goal with
     | |- CorrectAlignedEncoder empty_Format _ =>
