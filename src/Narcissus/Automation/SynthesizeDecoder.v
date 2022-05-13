@@ -34,8 +34,7 @@ Require Import
         Fiat.Narcissus.Formats.Delimiter
         Fiat.Narcissus.Automation.Decision
         Fiat.Narcissus.Automation.Common
-        Fiat.Narcissus.Automation.ExtractData
-        Fiat.Narcissus.Automation.NormalizeFormats.
+        Fiat.Narcissus.Automation.ExtractData.
 
 Ltac shelve_inv :=
   let H' := fresh in
@@ -229,7 +228,7 @@ Ltac apply_combinator_rule'
 
   | |- context [CorrectDecoder _ _ _ _ (format_list _) _ _ _] =>
     intros; apply FixList_decode_correct;
-    normalize_format; apply_rules
+    apply_rules
 
   (* Delimiter *)
   | |- context [CorrectDecoder _ _ _ _ (format_delimiter _ _ _) _ _ _] =>
