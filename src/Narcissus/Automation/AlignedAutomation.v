@@ -12,6 +12,12 @@ Require Import
         Fiat.Narcissus.Automation.Solver
         Fiat.Narcissus.Automation.NormalizeFormats.
 
+Require 
+        (*This library should probably go in the Binlib folder
+          ... But there are circularity problems
+         *)
+        Fiat.Narcissus.Formats.Derived.IndexedSumType.
+
 Require Import Bedrock.Word.
 
 Ltac start_synthesizing_decoder :=
@@ -594,40 +600,42 @@ Qed.
     : (forall (v : ByteString * CacheFormat), (format_word ◦ f) s env ∌ v) ->
       forall v : ByteString * CacheFormat,
         format_S s env ∌ v.
-  Proof.
-    intros; intro.
-    eapply H.
-    eapply refine_Projection_Format.
-    unfold format_word.
-    eauto.
-  Qed.
+Proof.
+  intros; intro.
+  eapply H.
+  eapply refine_Projection_Format.
+  unfold format_word.
+  eauto.
+Qed.
 
-  Ltac collapse_unaligned_words :=
-    intros;
-    eapply refine_CorrectAlignedEncoder;
-    [ split;
-      [repeat (eauto ; intros; eapply refine_CollapseFormatWord'; eauto);
-       unfold format_nat;
-       repeat first [ eapply refine_format_compose_map; intros
-                    | eapply refine_format_option_map; intros
-                    | eapply refine_format_bool_map
-                    | eauto using refine_format_bool, refine_format_unused_word_map,
-                      refine_format_bool_map, refine_format_unused_word,
-                      refine_format_option_map, refine_format_enum_map,
-                      refine_format_nat_map];
-       reflexivity
-      | eapply format_word_inhabited ]
-    | ].
+Ltac collapse_unaligned_words :=
+  intros;
+  eapply refine_CorrectAlignedEncoder;
+  [ split;
+    [repeat (eauto ; intros; eapply refine_CollapseFormatWord'; eauto);
+     unfold format_nat;
+     repeat first [ eapply refine_format_compose_map; intros
+                  | eapply refine_format_option_map; intros
+                  | eapply refine_format_bool_map
+                  | eauto using refine_format_bool, refine_format_unused_word_map,
+                    refine_format_bool_map, refine_format_unused_word,
+                    refine_format_option_map, refine_format_enum_map,
+                    refine_format_nat_map];
+     reflexivity
+    | eapply format_word_inhabited ]
+  | ].
 
 
-  Ltac start_synthesizing_encoder :=
-    lazymatch goal with
-    | |- CorrectAlignedEncoderFor ?Spec =>
+Ltac start_synthesizing_encoder :=
+  lazymatch goal with
+  | |- CorrectAlignedEncoderFor ?Spec =>
       try unfold Spec
-    end;
-    (* Memoize any string constants *)
-    (*pose_string_hyps; *)
-    eexists; simpl; intros.
+  end;
+  (* Memoize any string constants *)
+  (*pose_string_hyps; *)
+  eexists; simpl; intros.
+
+
 
 (* Redefine this tactic to implement new encoder rules *)
 Ltac new_encoder_rules := fail.
@@ -645,6 +653,8 @@ Ltac align_encoder_step :=
       | eexists; reflexivity ]
     end
   | new_encoder_rules
+  | eapply IndexedSumType.IndexedSumType_Encoder_Correct;
+          [ IndexedSumType.split_iterate | ]
   | eapply CorrectAlignedEncoderForFormatDelimiter; [
       unshelve (instantiate (1:=_))
     | unshelve (instantiate (1:=_)); [| unshelve (instantiate (2:=_)) ] ];
