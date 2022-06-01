@@ -23,6 +23,7 @@ Require Import
         Coq.Arith.Factorial
         Coq.Arith.Compare_dec.
 Require Import Coq.Logic.Eqdep_dec.
+Require Import Bedrock.Word.
 
 (*Aligned*)
 Require Import
@@ -35,7 +36,87 @@ Require Import
             
 
 (** Some useful exploratory tactics *)
-  Ltac ez_apply:=
+        
+        Lemma modusponens: forall (P Q: Prop), P -> (P -> Q) -> Q.
+        Proof. auto. Qed.
+        Lemma modusponensT: forall (P Q: Type), P -> (P -> Q) -> Q.
+Proof. auto. Qed.
+
+        Ltac exploit x :=
+          refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _ _) _)
+          || refine (modusponens _ _ (x _ _ _) _)
+          || refine (modusponens _ _ (x _ _) _)
+          || refine (modusponens _ _ (x _) _).
+        
+        Ltac exploitT x :=
+         refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _ _) _)
+          || refine (modusponensT _ _ (x _ _ _) _)
+          || refine (modusponensT _ _ (x _ _) _)
+          || refine (modusponensT _ _ (x _) _).
+
+Ltac ez_apply:=
     match goal with
       [H: _ |- _] => eapply H
     end.
@@ -312,6 +393,7 @@ Section ComposedPermutationFormat.
   
 End ComposedPermutationFormat.
 
+
 Section IndexedSumType.
   (*This is one way to ocnstruct indexed SumTypes, where the index is
   directly encoded in front of the encoder.
@@ -451,15 +533,15 @@ End IndexedSumType.
 Section WordSumType.
   (* We instantiate IndexedSumTypes using simpl words *)
 
-  Definition fin2Word {n:nat} (sz:nat) (idx: Fin.t n): word sz := Word.natToWord sz (FinFun.Fin2Restrict.f2n idx). 
-  Definition format_word_SumType {C n B} {monoid: Monoid B}
-             {cacheAddNat : CacheAdd C nat}
-             {monoidQB: QueueMonoidOpt monoid bool}
-             (sz : nat)
-             (types : Vector.t Type n)
-             (formats : ilist (B:=fun V => @FormatM V B C) types):
-    SumType types -> CacheFormat -> Comp (B * CacheFormat):= 
-      format_indexed_SumType types (format_word ◦ (fin2Word sz)) formats.
+  (* Definition fin2Word {n:nat} (sz:nat) (idx: Fin.t n): word sz := Word.natToWord sz (FinFun.Fin2Restrict.f2n idx).  *)
+  (* Definition format_word_SumType {C n B} {monoid: Monoid B} *)
+  (*            {cacheAddNat : CacheAdd C nat} *)
+  (*            {monoidQB: QueueMonoidOpt monoid bool} *)
+  (*            (sz : nat) *)
+  (*            (types : Vector.t Type n) *)
+  (*            (formats : ilist (B:=fun V => @FormatM V B C) types): *)
+  (*   SumType types -> CacheFormat -> Comp (B * CacheFormat):=  *)
+  (*     format_indexed_SumType types (format_word ◦ (fin2Word sz)) formats. *)
       
 End WordSumType.
 
