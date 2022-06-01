@@ -92,6 +92,7 @@ Ltac subst_projections :=
          end;
   unfold Basics.compose, IsProj in *.
 
+Create HintDb decide_data_invariant_db.
 Ltac decide_data_invariant :=
   (* Show that the invariant on the data is decideable. Most *)
   (* of the clauses in this predicate are obviously true by *)
