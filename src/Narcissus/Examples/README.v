@@ -7,6 +7,8 @@ Require Import Fiat.Narcissus.Automation.Invertible.
 
 Set Warnings "-local-declaration".
 Set Nested Proofs Allowed.
+
+
 (**
 The following section presents the Narcissus framework through a series of increasingly complex examples showcasing its main features.  Details are purposefuly omitted; they will be revealed in section N.  The end result is a moderately complex description for the packet format used by an indoor temperature sensor to report measurements to a smart home controller.
 **)
@@ -214,11 +216,38 @@ Definition *)
           || refine (modusponensT _ _ (x _ _ _) _)
           || refine (modusponensT _ _ (x _ _) _)
           || refine (modusponensT _ _ (x _) _).
+  Ltac ez_apply:=
+    match goal with
+      [H: _ |- _] => eapply H
+    end.
+  Ltac split_and_goal:=
+    repeat (intros; match goal with
+                           | |- _ /\ _ => split
+                    end); intros.
+Ltac inv H:= inversion H; subst.
 
+Module Unaligned.
+  Record sensor_msg :=
+    { stationID: word 5; data: word 4 }.
+
+  Let format :=
+       format_word ◦ stationID
+    ++ format_word ◦ data.
+
+  Let invariant (msg: sensor_msg) :=
+    True.
+
+  Let enc_dec : EncoderDecoderPair format invariant.
+  Proof. derive_encoder_decoder_pair. Defined.
+
+  Let encode := encoder_impl enc_dec.
+  
+ 
+
+                                        
 Module ReorderTest.
   Record sensor_msg :=
     { stationID: word 8; data: word 16 }.
-
   
   (* The predicate fro the permutation *)
   Definition idMap (msg: sensor_msg):
@@ -268,6 +297,16 @@ Module ReorderTest.
   Definition IsReorder (msg: sensor_msg) ls :=
     invert_reordering ls = Some msg.
   
+  Definition fin2Word {n:nat} (sz:nat) (idx: Fin.t n): word sz := Word.natToWord sz (FinFun.Fin2Restrict.f2n idx).
+  Definition format_word_SumType {C n B} {monoid: Monoid B}
+             {cacheAddNat : CacheAdd C nat}
+             {monoidQB: QueueMonoidOpt monoid bool}
+             (sz : nat)
+             (types : Vector.t Type n)
+             (formats : ilist.ilist (B:=fun V => @FormatM V B C) types):
+    SumType.SumType types -> CacheFormat -> Comp (B * CacheFormat):=
+      format_indexed_SumType types (format_word ◦ (fin2Word sz)) formats.
+     
       
   
   Definition types: t Type 2:=[word 8:Type; word 16:Type].
@@ -307,18 +346,50 @@ Module ReorderTest.
       Lemma CorrectAlignedEncoder_Projection2Compose
         : forall S S' (F: S -> S' -> Prop) (format_S : FormatM S' ByteString)
             (f : S -> S')
-            (encode : forall sz : nat, AlignedEncodeM sz),
-          (forall x y, f x = y -> F x y) ->
+            (encode : forall sz : nat, AlignedEncodeM sz)
+          (Hcorrect: forall x y, f x = y -> F x y)
+          (Hcomplete: forall x y env benv, F x y -> format_S y env ∋ benv -> exists benv', format_S (f x) env ∋ benv'),
           CorrectAlignedEncoder (format_S ◦ f)
                                 (Projection_AlignedEncodeM encode f) -> 
           CorrectAlignedEncoder (Compose_Format format_S F)
                                 (Projection_AlignedEncodeM encode f).
-      Proof. Admitted.
-      Lemma Permutation_eq {T}: 
-          forall (l1 l2:list T), l1 = l2 -> Permutation l1 l2.
+  Proof.
+    intros.
+    destruct X as [enc HH].
+    econstructor. split_and_goal; eauto; try eapply HH; eauto.
+    - etransitivity; [|eapply HH; eauto].
+      intros ?; repeat rewrite unfold_computes.
+      unfold "◦", Compose_Format.
+      intros [x []].
+      exists x; split; eauto.
+    - intros [x [H0 ?]].
+      eapply Hcomplete in H0; eauto.
+      destruct H0 as [x' H0].
+      eapply HH; eauto.
+      unfold "◦", Compose_Format.
+      rewrite unfold_computes.
+      eexists; split; eauto.
+  Qed.
+
+  (* When the sub-format is total, we can get rid of the dificult condition*)
+  Lemma CorrectAlignedEncoder_Projection2Compose_Total
+    : forall S S' (F: S -> S' -> Prop) (format_S : FormatM S' ByteString)
+        (f : S -> S')
+        (encode : forall sz : nat, AlignedEncodeM sz)
+        (Hcorrect: forall x y, f x = y -> F x y)
+        (Hcomplete: forall x env, exists benv, format_S x env ∋ benv),
+      CorrectAlignedEncoder (format_S ◦ f)
+                            (Projection_AlignedEncodeM encode f) -> 
+      CorrectAlignedEncoder (Compose_Format format_S F)
+                            (Projection_AlignedEncodeM encode f).
+  Proof. intros; eapply  CorrectAlignedEncoder_Projection2Compose; eauto. Qed.
+  
+    
+  Lemma Permutation_eq {T}: 
+    forall (l1 l2:list T), l1 = l2 -> Permutation l1 l2.
   Proof. intros; subst; apply Permutation_refl. Qed.
   Lemma IsReorder_ID: forall x, IsReorder x (idMap x).
-        Proof. intros x; destruct x; simpl. reflexivity. Qed.
+  Proof. intros x; destruct x; simpl. reflexivity. Qed.
         
   Lemma SimplPrimFst:
     forall A B (P: A -> Type),
@@ -341,9 +412,13 @@ Module ReorderTest.
       normalize_encoder_format. (*Does nothing*)
       (* Try directly deriving *)
       repeat align_encoder_step.
-      eapply CorrectAlignedEncoder_Projection2Compose.
+      eapply CorrectAlignedEncoder_Projection2Compose_Total.
       + intros. subst.
         eapply IsReorder_ID.
+      + (* Total *)
+        intros. eexists.
+        rewrite unfold_computes.
+        
       + repeat align_encoder_step.
         * eapply CorrectAlignedEncoderForFormatSumType; simpl.
           constructor; [|constructor]; simpl; try now constructor.
