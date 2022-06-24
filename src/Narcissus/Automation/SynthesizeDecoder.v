@@ -223,14 +223,21 @@ Ltac apply_combinator_rule'
 
   (*IndexedSumType*)
   | H: cache_inv_Property _ _ |- context [ CorrectDecoder _ _ _ _ (@IndexedSumType.format_IndexedSumType ?n ?sz ?types _ _ ) _ _ _ ]
-    => IndexedSumType.apply_IndexedSumType_Decoder_Correct' n types;
-      [  intuition eauto 2 with data_inv_hints (* ^ really only needs `subst_pow2;lia` but that is defined in Solver.v *)
-      | unfold Vector.nth; simpl; eapply H
-      | simpl; repeat match goal with
-                        |- IterateBoundedIndex.prim_and _ _ =>
-                          apply IterateBoundedIndex.Build_prim_and
-                      end; try exact I; simpl; intros
-      ]; apply_rules
+    => first [IndexedSumType.apply_IndexedSumTypeWord_Decoder_Correct n types;
+             [  intuition eauto 2 with data_inv_hints (* ^ really only needs `subst_pow2;lia` but that is defined in Solver.v *)
+             | unfold Vector.nth; simpl; eapply H
+             | simpl; repeat match goal with
+                               |- IterateBoundedIndex.prim_and _ _ =>
+                                 apply IterateBoundedIndex.Build_prim_and
+                             end; try exact I; simpl; intros
+             ]|
+             IndexedSumType.apply_IndexedSumType_Decoder_Correct n types;
+             [ unfold Vector.nth; simpl; eapply H
+             | simpl; repeat match goal with
+                               |- IterateBoundedIndex.prim_and _ _ =>
+                                 apply IterateBoundedIndex.Build_prim_and
+                             end; try exact I; simpl; intros
+             |intros]]; apply_rules
   | |- context [CorrectDecoder _ _ _ _ (format_SumType (B := ?B) (cache := ?cache) (m := ?n) ?types _) _ _ _] =>
     let cache_inv_H := fresh in
     intros cache_inv_H;
