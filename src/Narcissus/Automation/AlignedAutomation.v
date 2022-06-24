@@ -112,8 +112,11 @@ Ltac align_decoders_step :=
     | eapply @AlignedDecodeBindUnusedCharM; simpl; eauto;
       eapply DecodeMEquivAlignedDecodeM_trans;
       [ | intros; reflexivity
-        |  ]
+      |  ]
+    | eapply @IndexedSumType.AlignedDecodeFinByte; intros; eauto
+    | eapply @IndexedSumType.AlignedDecodeFinByte_Bind; intros; eauto
     | eapply @AlignedDecodeSumTypeM; intros; eauto
+    | eapply @AlignedDecodeSumTypeM_Bind; intros; eauto
     | eapply @AlignedDecodeListM; intros; eauto
     | eapply @AlignedDecodeCharM; intros; eauto
     | eapply (fun H H' => @AlignedDecodeNCharM _ _ H H' 8); eauto; simpl; intros
