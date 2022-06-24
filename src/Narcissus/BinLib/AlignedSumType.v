@@ -18,7 +18,9 @@ Require Import
         Fiat.Narcissus.BinLib.AlignedDecoders
         Fiat.Narcissus.BinLib.AlignWord
         Fiat.Narcissus.BinLib.AlignedEncodeMonad
-        Fiat.Narcissus.BinLib.AlignedDecodeMonad.
+        Fiat.Narcissus.BinLib.AlignedDecodeMonad
+        Fiat.Narcissus.Automation.Common (*`ilist_of_evar`, `makeEvar`*)
+.
 
 Require Import
         Bedrock.Word.
@@ -278,7 +280,7 @@ Section AlignedSumType.
     (fun v idx' cd => `(i, bs, cd') <- (ith aligned_decoders idx _ v idx' cd); Some (inj_SumType types idx i, bs, cd')).
 
   
-  Lemma AlignedDecodeSumTypeM {C : Type}
+  Lemma AlignedDecodeSumTypeM
         {n}
         {types : Vector.t Type (S n)}
         (decoders : ilist (B := fun T => ByteString -> CacheDecode -> option (T * ByteString * CacheDecode)) types)
@@ -327,7 +329,7 @@ Section AlignedSumType.
   Proof.
     intros.
     eapply Bind_DecodeMEquivAlignedDecodeM; eauto.
-    unshelve eapply AlignedDecodeSumTypeM; eauto.
+    eapply AlignedDecodeSumTypeM; eauto.
   Qed.
 
 End AlignedSumType.
