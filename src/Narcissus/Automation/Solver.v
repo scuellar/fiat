@@ -263,7 +263,10 @@ Ltac optimize_decoder_impl :=
                 | H : ?a = Some ?b |- (`(_, _, _) <- ?a; _) = _ => setoid_rewrite H; simpl
                 end
             | apply DecodeBindOpt2_under_bind'; simpl; intros
-            | eapply optimize_under_if_opt; simpl; intros
+            | match goal with
+                |- context[If_Opt_Then_Else ?s _ _ = _] =>
+                  eapply optimize_under_if_opt; simpl; intros
+              end
             | eapply optimize_under_if_bool; simpl; intros
             | eapply optimize_under_if; simpl; intros]);
   higher_order_reflexivity.
