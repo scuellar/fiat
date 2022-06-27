@@ -670,6 +670,7 @@ Ltac align_encoder_step :=
   | apply CorrectAlignedEncoderForFormatNat
   | apply CorrectAlignedEncoderForFormat2Nat; eauto
   | apply CorrectAlignedEncoderForFormatEnum
+  | eapply CorrectAlignedEncoderForFormatSumType; eauto
   | eapply CorrectAlignedEncoderForFormatByteBuffer; eauto using encoder_empty_cache_OK
   | eapply CorrectAlignedEncoderProjection
   | eapply (fun H H' => CorrectAlignedEncoderForFormatNEnum H H' 2); [ solve [ eauto ] | solve [ eauto ] ]
