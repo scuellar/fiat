@@ -163,3 +163,50 @@ Module SumTypeCodes_Enum.
   Let decode := decoder_impl enc_dec.
   
 End SumTypeCodes_Enum.
+
+
+(** * Motivating example*)
+(* | Another example using Enum, which originally motivated this format.
+ *)
+Module SumTypeCodes_Enum_Motivate.
+
+  (* This was the motivating example, which follows immidiately from out `format_IndexedSumType_enum` *)
+  Definition format_SumTypeCodes {m} {sz}
+             (types : Vector.t Type (S m))
+             (formatrs :
+                ilist (B := fun T =>
+                 T -> CacheFormat -> Comp (ByteString * CacheFormat)) types)
+             (codes : Vector.t (word sz) (S m))
+             (st : SumType types)
+    : CacheFormat -> Comp (ByteString * CacheFormat):=
+    format_IndexedSumType_enum m codes formatrs st.
+
+  (* Then we can show an example with that format *)
+  Let types:= [word 8:Type; word 16:Type; word 32:Type; word 16:Type; word 8:Type].
+  
+  Definition formats : ilist (B := fun T => FormatM T ByteString) types
+    := {{ format_word; format_word; format_word; format_word; format_word }}.
+  
+  Let invariants := ilist_constant_T types.
+  Let view_fin {n} (f:Fin.t n):= f2n f < pow2 8.
+  Let constT {T} (a:T):= True.
+  Let invariant := (fun st : SumType types =>  ((constant True) (SumType_index types st)) /\ ith invariants (SumType_index types st) (SumType_proj types st)).
+
+  (* Let's index the entries using prime numbers *)
+  Let codes: Vector.t (word 8) 5:= [[ natToWord _ 2; natToWord _ 3; natToWord _ 5; natToWord _ 7; natToWord _ 11 ]].
+
+  Let enc_dec : EncoderDecoderPair (format_SumTypeCodes types formats codes) invariant.
+  Proof.
+    unfold format_SumTypeCodes, format_IndexedSumType_enum.
+    derive_encoder_decoder_pair.
+
+      Unshelve.
+        (* This one is due to way `align_decoders_step`  deals with
+           `IterateBoundedIndex.prim_and`.
+           There is an already shelved `ilist` that slowly
+           decreases but obviously never gets completed (since the last goal doesn't depend).
+         *)
+    constructor.
+  Defined.
+  
+End SumTypeCodes_Enum_Motivate.
