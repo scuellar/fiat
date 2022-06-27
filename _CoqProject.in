@@ -223,6 +223,7 @@ src/Narcissus/Automation/AlignedAutomation.v
 src/Narcissus/Automation/CacheEncoders.v
 src/Narcissus/Automation/Common.v
 src/Narcissus/Automation/Decision.v
+src/Narcissus/Automation/Error.v
 src/Narcissus/Automation/ExtractData.v
 src/Narcissus/Automation/NormalizeFormats.v
 src/Narcissus/Automation/Solver.v
@@ -254,6 +255,7 @@ src/Narcissus/Common/Notations.v
 src/Narcissus/Common/Sig.v
 src/Narcissus/Common/Specs.v
 src/Narcissus/Common/WordFacts.v
+src/Narcissus/Common/EncoderDecoderProjections.v
 src/Narcissus/ComplementaryFormats/ComplementaryFormat.v
 src/Narcissus/Examples/ByteAlignedExample.v
 src/Narcissus/Examples/ICMP_Packet.v
@@ -310,6 +312,7 @@ src/Narcissus/Formats/Vector.v
 src/Narcissus/Formats/WordOpt.v
 src/Narcissus/Formats/Reorder.v
 src/Narcissus/Formats/Derived/IndexedSumType.v
+src/Narcissus/Formats/XML.v
 src/Narcissus/Formats/Base/EnqueueFormat.v
 src/Narcissus/Formats/Base/FMapFormat.v
 src/Narcissus/Formats/Base/FixFormat.v

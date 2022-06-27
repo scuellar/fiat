@@ -4,7 +4,6 @@ general sense), we use the invertibility of the function/relation to
 recover the encoded object.  *)
 
 Require Import Fiat.Narcissus.Examples.TutorialPrelude.
-Require Import Fiat.Narcissus.Formats.Reorder.
 Require Import 
         Coq.Sorting.Permutation.
 Require Import Fiat.Narcissus.Automation.Invertible.
@@ -154,48 +153,6 @@ Module FinT.
 
   Let format_fin n: Fin.t n -> CacheFormat -> Comp (ByteString * CacheFormat)  :=
         format_word ◦ (fin2Word n).
-  
-  (* (*Testing something*) *)
-
-  (* Let invariant {n} (fi:Fin.t n):= Fin2Restrict.f2n fi < pow2 n. *)
-  
-  (* Let enc_dec : EncoderDecoderPair (format_fin 32) invariant. *)
-  (* Proof. *)
-  (*   (*derive_encoder_decoder_pair.*) *)
-  (*   econstructor; *)
-  (*     [ synthesize_aligned_encoder | ]. *)
-  (*   - (*synthesize_aligned_decoder. *) *)
-  (*     start_synthesizing_decoder. *)
-  (*     + unfold invariant; simpl. *)
-  (*       match goal with *)
-  (*         |- ?g => assert(BOGUS_HYP: g); [shelve | clear BOGUS_HYP ] *)
-  (*       end. *)
-  (*       normalize_format; apply_rules. *)
-  (*       + cbv beta; synthesize_cache_invariant. *)
-  (*       + cbv beta; unfold decode_nat, sequence_Decode; *)
-  (*           optimize_decoder_impl. *)
-  (*       + cbv beta; align_decoders. *)
-
-  (*         Unshelve. *)
-  (*         simpl. simpl in *. *)
-
-  (*           CorrectDecoder AlignedByteString.ByteStringQueueMonoid *)
-  (*   (fun fi : Fin.t 32 => Fin2Restrict.f2n fi < pow2 32) *)
-  (*   (fun fi : Fin.t 32 => Fin2Restrict.f2n fi < pow2 32) eq  *)
-  (*   (format_fin 32) *)
-  (*   (sequence_Decode decode_word *)
-  (*      (fun (v1 : word 32) (t' : ByteString) (ctxD : ()) => *)
-  (*       if *)
-  (*        ((if lt_dec (Fin2Restrict.f2n (word2Fin v1)) (pow2 32) *)
-  (*          then true *)
-  (*          else false) && weqb (fin2Word 32 (word2Fin v1)) v1)%bool *)
-  (*       then Some (word2Fin v1, t', ctxD) *)
-  (*       else None)) (constant True) (format_fin 32) *)
-
-          
-  (*         normalize_format; apply_rules. *)
-  (*         Set Printing Implicit *)
-
   
   Record sensor_msg :=
     { stationID: Fin.t 16; data: word 16 }.

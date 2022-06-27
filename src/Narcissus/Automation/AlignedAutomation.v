@@ -1,6 +1,8 @@
 Require Export Fiat.Common.Coq__8_4__8_5__Compat.
 Require Import
+        Coq.Strings.String
         Coq.ZArith.ZArith
+        Fiat.Narcissus.Automation.Error
         Fiat.Narcissus.BinLib
         Fiat.Narcissus.Common.Specs
         Fiat.Narcissus.Common.ComposeOpt
@@ -21,7 +23,7 @@ Require
 Require Import Bedrock.Word.
 
 Ltac start_synthesizing_decoder :=
-  match goal with
+  lazymatch goal with
   | |- CorrectAlignedDecoderFor ?Invariant ?Spec =>
     try unfold Spec (*; try unfold Invariant *)
   end;
@@ -37,9 +39,18 @@ Ltac eapply_formatnchars_thm_simplified thm sz :=
   let tm_t := (eval simpl in tm_t) in
   eapply (tm: tm_t).
 
+Ltac apply_new_align_decoder_rule := fail.
+
 Ltac align_decoders_step :=
   first [
-      match goal with
+      apply_new_align_decoder_rule
+    | lazymatch goal with
+      | |- DecodeMEquivAlignedDecodeM ?decode _ =>
+          let lem := constr:(_ : has_prop_for decode
+                                   (@DecodeMEquivAlignedDecodeM))
+          in eapply lem
+      end; intros
+    | match goal with
       | |- IterateBoundedIndex.prim_and _ _ =>
         apply IterateBoundedIndex.Build_prim_and; intros;
         [ eapply DecodeMEquivAlignedDecodeM_trans;
@@ -55,9 +66,28 @@ Ltac align_decoders_step :=
             try (instantiate (1 := ilist.icons _ _); simpl; intros; higher_order_reflexivity)]
         | try exact I]
       | |- context [ decode_string_with_term_char ?term_char _ _] =>
+          (* FIXME: this seems broken *)
       eapply (fun H H' => @AlignedDecodeStringTermCharM _ _ H H' _ (NToWord 8 (Ascii.N_of_ascii term_char))); intros; eauto
       end
-    | eapply @AlignedDecodeDelimiterSimpleM; intros
+    (* This is quite ugly, but it's much faster than blindly trying lemmas. *)
+    | lazymatch goal with
+      | |- DecodeMEquivAlignedDecodeM (decode_delimiter_simple _ _ _) _  =>
+          eapply @AlignedDecodeDelimiterSimpleM'
+      | |- DecodeMEquivAlignedDecodeM (fun _ _ => decode_delimiter_simple _ _ _ _ _) _  =>
+          eapply @AlignedDecodeDelimiterSimpleM'
+      | |- DecodeMEquivAlignedDecodeM
+             (fun _ _ => `(_, _, _) <- decode_delimiter_simple _ _ _ _ _; _) _  =>
+          eapply @AlignedDecodeDelimiterSimpleM
+      | |- DecodeMEquivAlignedDecodeM (decode_delimiter _ _) _  =>
+          eapply @AlignedDecodeDelimiterM'
+      | |- DecodeMEquivAlignedDecodeM (fun _ _ => decode_delimiter _ _ _ _) _  =>
+          eapply @AlignedDecodeDelimiterM'
+      | |- DecodeMEquivAlignedDecodeM
+             (fun _ _ => `(_, _, _) <- decode_delimiter _ _ _ _; _) _  =>
+          eapply @AlignedDecodeDelimiterM
+      end; intros
+    | eapply @AlignedDecodeLexemeM; intros
+    | eapply @AlignedDecodeStringM'
     | eapply @AlignedDecodeNatM; intros
     | eapply @AlignedDecodeByteBufferM; intros; eauto
     | eapply @AlignedDecodeBind2CharM; intros; eauto
@@ -157,6 +187,16 @@ Ltac synthesize_aligned_decoder :=
     continue_on_fail_1
     continue_on_fail
 .
+
+Ltac maybe_synthesize_aligned_decoder := maybe ltac:(fun _ => timeout 30 synthesize_aligned_decoder) "Unable to synthesize decoder."%string.
+
+Definition extractDecoder {S inv fmt}
+           (d : Maybe (CorrectAlignedDecoderFor (S := S) inv fmt))
+  : MaybeT (forall sz : nat, AlignedDecodeM S sz) d :=
+  match d with
+  | Failure s => s
+  | Success a => projT1 a
+  end.
 
 Lemma length_encode_word' sz :
   forall (w : word sz) (b : ByteString),
@@ -659,9 +699,10 @@ Ltac align_encoder_step :=
   | eapply IndexedSumType.IndexedSumType_Encoder_Correct;
           [ IndexedSumType.split_iterate | ]
   | eapply CorrectAlignedEncoderForFormatDelimiter; [
-      unshelve (instantiate (1:=_))
-    | unshelve (instantiate (1:=_)); [| unshelve (instantiate (2:=_)) ] ];
-    eauto using encoder_empty_cache_OK
+    | unshelve (instantiate (1:=_))
+    | unshelve (instantiate (1:=_)) ]; eauto using encoder_empty_cache_OK
+  | eapply CorrectAlignedEncoderForFormatLexeme; eauto
+  | eapply CorrectAlignedEncoderForFormatString; eauto
   | eapply CorrectAlignedEncoderForFormatList; unshelve (instantiate (1 := _));
     eauto using encoder_empty_cache_OK
   | eapply CorrectAlignedEncoderForFormatVector; unshelve (instantiate (1 := _));
@@ -713,8 +754,13 @@ Global Opaque cache_inv_Property.
 Global Opaque CorrectDecoder.
 Global Arguments andb : simpl never.
 Global Arguments pow2 : simpl never.
+Global Opaque format_delimiter.
+Global Opaque decode_delimiter.
+Global Opaque decode_delimiter_simple.
 Arguments word_indexed : simpl never.
 Arguments weqb : simpl never.
+Arguments decode_string : simpl never.
+Arguments String.eqb : simpl never.
 
 Ltac encoder_reflexivity :=
   match goal with
