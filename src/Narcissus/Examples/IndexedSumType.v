@@ -45,7 +45,9 @@ Module SumTypeCodes2.
   Let enc_dec : EncoderDecoderPair (format_IndexedSumType_word 8 formats) invariant.
   Proof.
     unfold format_IndexedSumType_word.
-    derive_encoder_decoder_pair.
+    derive_encoder_decoder_pair. 
+
+    
     Unshelve.
     (* This one is due to way `align_decoders_step`  deals with
        `IterateBoundedIndex.prim_and`.

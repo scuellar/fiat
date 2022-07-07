@@ -311,6 +311,7 @@ src/Narcissus/Formats/SumTypeOpt.v
 src/Narcissus/Formats/Vector.v
 src/Narcissus/Formats/WordOpt.v
 src/Narcissus/Formats/XML.v
+src/Narcissus/Formats/PermutationOpt.v
 src/Narcissus/Formats/Derived/IndexedSumType.v
 src/Narcissus/Formats/Base/EnqueueFormat.v
 src/Narcissus/Formats/Base/FMapFormat.v
