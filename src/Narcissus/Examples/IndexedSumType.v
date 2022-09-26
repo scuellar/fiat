@@ -87,25 +87,26 @@ Module SumTypeCodes3.
     Let enc_dec : EncoderDecoderPair (format_IndexedSumType_word 8 formats) invariant.
     Proof.
       unfold format_IndexedSumType_word.
-      derive_encoder_decoder_pair.
+      (* derive_encoder_decoder_pair. *)
       
-      (* (*below are the instructions to do the automation step-by-step*)
+       (*below are the instructions to do the automation step-by-step*)
 
       econstructor.
       - synthesize_aligned_encoder.
       - start_synthesizing_decoder.
-        + normalize_format.
-          (* apply_IndexedSumTypeWord_Decoder_Correct 3 types.
-          {intuition
-              eauto 2 with data_inv_hints. }  *)
-          
-          apply_rules.
+        + normalize_format; apply_rules.
         + cbv beta; synthesize_cache_invariant.
-        + cbv beta; unfold decode_nat, sequence_Decode; optimize_decoder_impl.
+        + cbv beta; unfold decode_nat, sequence_Decode; optimize_decoder_impl. (* optimize decoder!*)
         + cbv beta.
-          repeat align_decoders_step. *)
+          repeat align_decoders_step.
           
 
+                 (*
+ltac:(start_synthesizing_decoder)
+   ltac:(normalize_format; apply_rules) ltac:(cbv beta; synthesize_cache_invariant)
+   ltac:(cbv beta; unfold decode_nat, sequence_Decode; optimize_decoder_impl)
+   ltac:(cbv beta; align_decoders)
+                  *)
       
       (* align_decoders_step' *)
       (* AlignedDecodeSumTypeM *)

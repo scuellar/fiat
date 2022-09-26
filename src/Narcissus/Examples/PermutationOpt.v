@@ -59,7 +59,8 @@ Module Permutation.
   Let myCodes: Vector.t (word 8) 2:= [[ natToWord _ 42; natToWord _ 73 ]].
   Let myFinFormat:= (format_enum myCodes).
   
-  Let myFormats: ilist (B := fun T => FormatM T ByteString) (myTypes myProjections) := {{ format_word; format_word }}.
+  Let myFormats: ilist (B := fun T => FormatM T ByteString) (myTypes myProjections)
+      := {{ format_word; format_word }}.
   
   Let myFormat := False .
 
@@ -67,17 +68,305 @@ Module Permutation.
     eapply Permutation_Encoder_Correct;
       [| unfold Vector.nth; repeat constructor | |IndexedSumType.split_iterate ]; simpl;
       eauto with resilience.
+  Definition inv (msg: message):= True.
   
-  Let enc_dec : EncoderDecoderPair (permutation_Format myProjections myFinFormat myFormats) (constant True).
+  Let enc_dec : EncoderDecoderPair (permutation_Format myProjections myFinFormat myFormats ++ empty_Format) inv.
   Proof.
     unfold myFinFormat.
     (* derive_encoder_decoder_pair. *)
     econstructor.
     - synthesize_aligned_encoder.
-    - 
+    - (* synthesize_aligned_decoder*)
+      start_synthesizing_decoder.
+      + normalize_format.
+        (* Set Printing Implicit. *)
+        let types' := eval unfold types in types in
+          ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
+            ltac:(fun decoders' =>
+                    ilist_of_evar (fun T : Type => T -> Prop) types'
+                      ltac:(fun invariants' =>
+                              Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
+                                ltac:(fun cache_invariants' =>
+                                        eapply Permutation_decoder with
+                                        (cache_invariants := cache_invariants')
+                                        (invariants:= invariants')
+                                        (decoders:= decoders')
+                           )));
+    try solve[apply_rules]; cycle 1.
+    * split. 2: split. 
+      all: simpl; intros.
+      apply_rules.
+      apply_rules.
+      constructor.
+    * intros ????.
+      repeat (split; auto).
+    * Transparent cache_inv_Property.
+      unfold cache_inv_Property in *; repeat split;
+        unfold Vector.nth; simpl in *; auto.
+      shelve.
+      shelve.
+    * (* extract_view *)
+      (* ExtractSource *)
+      
+      Definition decidesOpt {a} (op: option a) (predicate: a -> Prop):=
+        Ifopt op as s Then predicate s Else forall s, ~ predicate s.
+
+      
+      Definition decidesOptBool {a} (op: option a) (b: a -> bool) (predicate: a -> Prop):=
+        Ifopt op as s Then (decides (b s) (predicate s)) Else forall s, ~ predicate s.
+
+      Definition filter_decode {S B} (op:option S): DecodeM (S * B) B:=
+        (fun t' ctxD =>
+           match op with
+           | Some s => Some (s, t', ctxD)
+           | _ =>  None
+           end).
+
+      
+      Definition filter_decode_bool {S B} (op:option S) (b:S -> bool) : DecodeM (S * B) B:=
+        (fun t' ctxD =>
+           match op with
+           | Some s => if (b s) then Some (s, t', ctxD) else None
+           | _ =>  None
+           end).
 
 
+      (** *Comment this one*)
+      (* eapply CorrectDecoderEmpty. *)
+      
+      Corollary CorrectDecoderEmptyOptBool {S T}
+        : forall (monoid : Monoid T)
+            (Source_Predicate : S -> Prop)
+            (decode_inv : CacheDecode -> Prop)
+            (op : option S) (b: S-> bool),
+          (forall s', Ifopt op as s Then Source_Predicate s' -> s' = s Else True) ->
+          decidesOptBool op b Source_Predicate 
+          -> CorrectDecoder
+              monoid
+              Source_Predicate
+              Source_Predicate
+              eq
+              empty_Format
+              (filter_decode_bool op b)
+              decode_inv
+              empty_Format.
+        Admitted.
+        
+      Corollary CorrectDecoderEmptyOpt {S T}
+        : forall (monoid : Monoid T)
+            (Source_Predicate : S -> Prop)
+            (decode_inv : CacheDecode -> Prop)
+            (op : option S),
+          (forall s', Ifopt op as s Then Source_Predicate s' -> s' = s Else True) ->
+          decidesOpt op Source_Predicate 
+          -> CorrectDecoder
+              monoid
+              Source_Predicate
+              Source_Predicate
+              eq
+              empty_Format
+              (filter_decode op)
+              decode_inv
+              empty_Format.
+      Proof.
+        intros.
+        destruct op.
+        - eapply ExtractViewFrom; eauto; unfold empty_Format; eauto.
+        - Transparent CorrectDecoder.
+          unfold CorrectDecoder, empty_Format; split. intros.
+          + elimtype False; eapply H0. eauto.
+          + discriminate.
+      Qed.
+      
+      Fixpoint sortType {m} {types : Vector.t Type m}
+        (ls: list (SumType types)): option (ilist (B:=id) types).
+      Admitted.
 
+      
+      
+      simpl; intros.
+      eapply CorrectDecoderEmptyOpt.
+      
+      -- unfold Heading.Domain, Tuple.GetAttribute, Tuple.GetAttributeRaw,
+           Basics.compose in *; simpl in *.
+         let a' := fresh in
+         intros a'; try destruct a'.
+         match goal with
+           |- context [If_Opt_Then_Else ?x _ _] =>
+             destruct x as [XX|] eqn:HeqXX; simpl; auto
+         end.
+         unfold inv; simpl; intros [].
+         simpl in H3.
+         clear H1.
+         assert (HH:forall  s s', iapp myProjections s = iapp myProjections s' -> s = s'); cycle 1.
+         eapply HH; simpl.
+
+         Definition messageFromIlist 
+           (ls: ilist(B:=id) types) : option message.
+         Proof.
+           unfold types in *.
+           destruct ls as [T0 ls].
+           destruct ls as [T1 _].
+           unfold id in *.
+           left; constructor; eauto.
+         Defined. (*Can't be stated for a generic `message`. Prove in Ltac*)
+         
+         Fixpoint messageFromlist
+           (ls: list (SumType types)): option message :=
+           match sortType ls with
+           | Some i => messageFromIlist i
+           | None => None
+           end.
+           
+         instantiate(1:=messageFromlist v1) in HeqXX.
+         
+         
+         
+         (* What needs to be done:
+            Rewrite the format to be a format of ilist.
+            Then we can compose it to make it a format of S (e.g. `message`)
+
+
+          *)
+         
+         admit. (* Cant be stated as a lemma prove in Ltac. *)
+         
+         admit. (*Projections must be injective. Easy Ltac proof*) 
+         
+         
+
+     
+      -- match goal with
+           |- decidesOpt ?x _ => destruct x eqn:HHx; simpl
+         end.
+
+         
+        Lemma decidesOpt_and:
+           forall {B B'}
+             (ob : option B)(ob' : option B')
+             (P : B -> Prop)
+             (Q : B' -> Prop),
+             decidesOpt ob P ->
+             decidesOpt ob' Q ->
+             decidesOpt (match (ob, ob') with
+                      | (Some b, Some b') => Some (b, b')
+                      | _ => None
+                         end) (fun bb' => P (fst bb') /\ Q (snd bb')).
+         Admitted.
+
+         
+         
+
+
+        Lemma decidesOpt_and:
+           forall {B B'}
+             (ob : option B)(ob' : option B')
+             (P : B -> Prop)
+             (Q : B' -> Prop),
+             decidesOpt ob P ->
+             decidesOpt ob' Q ->
+             decidesOpt (match (ob, ob') with
+                      | (Some b, Some b') => Some (b, b')
+                      | _ => None
+                         end) (fun bb' => P (fst bb') /\ Q (snd bb')).
+         Admitted.
+          Lemma decidesOpt_and_r':
+           forall {B}
+             (ob : option B)(b' : bool )
+             (P : B -> Prop)
+             (Q : Prop),
+             decidesOpt ob P ->
+             decides b' Q ->
+             decidesOpt (if b' then ob else None) (fun ob => P ob /\ Q ).
+         Admitted. 
+         Lemma decidesOpt_and1:
+           forall {B}
+             (ob: option B)
+             (P : B -> Prop)
+             (Q : B -> Prop),
+             decidesOpt ob P ->
+             decidesOpt ob Q ->
+             decidesOpt ob (fun bb' => P bb' /\ Q bb').
+         Admitted.
+         
+         Lemma decidesOpt_true:
+           forall {B}
+             (ob: option B),
+             decidesOpt ob (constant True).
+         Admitted.
+         
+         eapply decidesOpt_and.
+         eapply decidesOpt_true.
+
+         
+
+         
+         
+         Lemma decidesOpt_permutation:
+           forall {B n} {types: Vector.t Type n}
+             (ob: option B) v1
+             (f: option (ilist(B:=id) types) -> option (message))
+             (projs: ilist(B:= fun T => message -> T) types),
+             decidesOpt (f (sortType v1))
+               (fun s : message => Permutation (to_list projs s) v1).
+         Admitted.
+         eapply decidesOpt_permutation.
+         
+         
+         
+         
+         
+         
+        build_fully_determined_type.
+        decide_data_invariant.
+
+        exact (sortType v1).
+
+      
+      (* Need to assume that all the values in v1 are of different
+         types!  That way we know we can construct a canonincal
+         element from it.  Otherwise, `s` might not exists (notice the
+         only thing in the environment of `s` is `v1`. *)
+
+      (* SOLUTION: Wrap the format in a checking format that filters things
+         that don't satisfy the predicate!*)
+
+      2:{ 
+      2:{ decide_data_invariant.
+      [ build_fully_determined_type |  ] ]
+
+      
+    
+    * simpl.
+      
+    
+        
+        ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types
+          ltac:(fun decoders' => 
+                  eapply Permutation_decoder ()).
+        
+        eapply Permutation_decoder; try solve[apply_rules].
+        * simpl.
+          Transparent cache_inv_Property.
+          unfold cache_inv_Property; repeat split.
+
+          
+        admit.
+        
+        
+        
+        eapply Permutation_decoder.
+        
+      + cbv beta; synthesize_cache_invariant.
+   ltac:(cbv beta; unfold decode_nat, sequence_Decode;
+          optimize_decoder_impl) ltac:(cbv beta; align_decoders)
+
+      Ltac apply_new_combinator_rule ::=
+        eapply Permutation_decoder.
+      synthesize_aligned_decoder.
+
+
+*)
 
 
 
@@ -205,18 +494,16 @@ Module PermutationCodes2.
   
   Let enc_dec : EncoderDecoderPair myFormat (constant True).
   Proof.
-    unfold format_through_list.
+    (*unfold myFormat,format_through_list, format_permutation_list.*)
     (* derive_encoder_decoder_pair. *)
     econstructor.
     - (* synthesize_aligned_encoder. *)
       start_synthesizing_encoder.
       normalize_encoder_format.
-      eapply Permutation_Encoder_Correct.
       
-
       align_encoder_step. (*splits emty*)
       align_encoder_step. (* removes empty*)
-      eapply CorrectAlignedEncoderProjection.
+      (*eapply CorrectAlignedEncoderProjection.*)
       align_encoder_step. (*projection*)
       
       unfold format_permutation_list.
@@ -279,12 +566,38 @@ Module PermutationCodes2.
                  apply EquivFormat_reflexive ] ; idtac "11"
              | unfold EquivFormat; intros; reflexivity ]); 
           intros.
-        normalize_encoder_format. 
-        
+        normalize_format. 
         eapply sequence_Compose_format_decode_correct; cycle 1.
         * unfold format_SumType_list.
-          apply_rules.
+          unfold myFinFormat.
+          (*1*) intros; apply FixList_decode_correct.
+          apply_IndexedSumType_Decoder_Correct 2 types.
+          unfold Vector.nth; simpl; eapply H.
+          simpl;
+            repeat
+              match goal with
+              | |- IterateBoundedIndex.prim_and _ _ =>
+                  apply
+                    IterateBoundedIndex.Build_prim_and
+              end; try exact I; simpl; 
+            intros.
+            3: intros.
 
+          intuition
+              eauto
+              2
+            with data_inv_hints.
+          2: { unfold Vector.nth; simpl; eapply H.
+              | .
+          simpl;
+            repeat
+              match goal with
+              | |- IterateBoundedIndex.prim_and _ _ =>
+                  apply IterateBoundedIndex.Build_prim_and
+              end; try exact I; simpl; intros. ].
+          
+          apply_rules.
+          
         * intuition; split; try reflexivity.
           etransitivity.
           symmetry; eapply Permutation_length; eauto.
