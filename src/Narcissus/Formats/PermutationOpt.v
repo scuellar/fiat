@@ -4,59 +4,59 @@ Set Nested Proofs Allowed.
  *)
 
 Require Import
-        Fiat.Narcissus.Common.Notations
-        Fiat.Narcissus.Common.Specs
-        Fiat.Narcissus.Common.EquivFormat
-        Fiat.Narcissus.Common.ComposeOpt
-        Fiat.Narcissus.Formats.Base.FMapFormat
-        Fiat.Narcissus.Formats.Base.SequenceFormat
-        Fiat.Narcissus.Formats.StringOpt
-        Fiat.Narcissus.Formats.Empty
-        Fiat.Narcissus.Formats.WordOpt
-        Fiat.Narcissus.Formats.Base.UnionFormat
-        Fiat.Common.SumType
-        Fiat.Narcissus.Formats.SumTypeOpt
-        Fiat.Narcissus.Formats.FixListOpt
-        Fiat.Narcissus.Formats.EnumOpt
-        Fiat.Narcissus.Formats.Sequence
-        Fiat.Narcissus.Formats.Derived.IndexedSumType.
+  Fiat.Narcissus.Common.Notations
+  Fiat.Narcissus.Common.Specs
+  Fiat.Narcissus.Common.EquivFormat
+  Fiat.Narcissus.Common.ComposeOpt
+  Fiat.Narcissus.Formats.Base.FMapFormat
+  Fiat.Narcissus.Formats.Base.SequenceFormat
+  Fiat.Narcissus.Formats.StringOpt
+  Fiat.Narcissus.Formats.Empty
+  Fiat.Narcissus.Formats.WordOpt
+  Fiat.Narcissus.Formats.Base.UnionFormat
+  Fiat.Common.SumType
+  Fiat.Narcissus.Formats.SumTypeOpt
+  Fiat.Narcissus.Formats.FixListOpt
+  Fiat.Narcissus.Formats.EnumOpt
+  Fiat.Narcissus.Formats.Sequence
+  Fiat.Narcissus.Formats.Derived.IndexedSumType.
 Require Import
-        Fiat.Common.List.ListFacts
-        Fiat.Common.ilist.
+  Fiat.Common.List.ListFacts
+  Fiat.Common.ilist.
 Require Import
-        Coq.Strings.String
-        Coq.Sorting.Permutation
-        Coq.Arith.Factorial
-        Coq.Arith.Compare_dec.
+  Coq.Strings.String
+  Coq.Sorting.Permutation
+  Coq.Arith.Factorial
+  Coq.Arith.Compare_dec.
 Require Import Coq.Logic.Eqdep_dec.
 Require Import Bedrock.Word.
 
 (*Aligned*)
 Require Import
-        Fiat.Narcissus.BinLib.AlignedList
-        Fiat.Narcissus.BinLib.AlignedByteString
-        Fiat.Narcissus.BinLib.AlignedEncodeMonad
-        Fiat.Narcissus.BinLib.AlignedSumType
-        Fiat.Narcissus.BinLib.AlignWord
-        Fiat.Narcissus.BinLib.AlignedDecodeMonad.
+  Fiat.Narcissus.BinLib.AlignedList
+  Fiat.Narcissus.BinLib.AlignedByteString
+  Fiat.Narcissus.BinLib.AlignedEncodeMonad
+  Fiat.Narcissus.BinLib.AlignedSumType
+  Fiat.Narcissus.BinLib.AlignWord
+  Fiat.Narcissus.BinLib.AlignedDecodeMonad.
 
 (* Automation *)
 Require Import
-        Fiat.Narcissus.Automation.NormalizeFormats
-        Fiat.Narcissus.Automation.ExtractData
-        Fiat.Narcissus.Automation.Common
-        Fiat.Narcissus.Automation.Invertible.
+  Fiat.Narcissus.Automation.NormalizeFormats
+  Fiat.Narcissus.Automation.ExtractData
+  Fiat.Narcissus.Automation.Common
+  Fiat.Narcissus.Automation.Invertible.
 
 Require Import Fiat.Narcissus.BinLib.
 
 (*Fin.t*)
 Require Import
-        Coq.Logic.FinFun.
+  Coq.Logic.FinFun.
 Import Fin2Restrict.
 
 
 Require Import 
-        Coq.ZArith.ZArith.
+  Coq.ZArith.ZArith.
 
 
 (** *TEMP tactics
@@ -384,27 +384,12 @@ Section Resilience.
   Qed.
 End Resilience.
 
-Section PermutationToList.
 
-  (* Since identity is a permutation, composing with permutations
-  refines to no composition*)
-  Lemma refine_compose_permutation:
-    forall A T s env (format1: FormatM (list A) T),
-      refine (Compose_Format (format1) (Permutation (A:=A)) s env)
-             (format1 s env).
-  Proof.
-    unfold refine; intros *; repeat rewrite unfold_computes.
-    unfold Compose_Format.
-    exists s; split ; auto.
-  Qed.
-
+Section List2Ilist.
+  (* In this section we create an empty_Format, that can translate a
+  given `list (SumType types)` to an `ilist(B:=id) types` (with possibility of failure). *)
 
   
-  (** *The Format*)
-  
-  (* | Adds a type to the type of a SumType. Doesn't change the element.
-     Has no computational effect.
-   *)
   Definition lift_SumType (A:Type) {n:nat} {types:Vector.t Type n} :
     SumType types -> SumType (Vector.cons Type A _ types):=
     match types as typs return
@@ -417,36 +402,7 @@ Section PermutationToList.
         fun elem => inr elem
     end.
 
-  (* Turns any element into a list, given projections for all it's
-  components*)
-  (* Old version
-     The new version is more compositional
-   *)
-  Fixpoint to_list' {n:nat} {S:Type} {types:Vector.t Type n}:
-    forall projections: ilist (B:= fun T => S -> T) types, 
-      S -> list (SumType types):=
-    match types as typs return
-          ilist (B:= fun T => S -> T) typs ->  
-          S -> list (SumType typs) with
-    | Vector.nil => fun _ _ => Datatypes.nil
-    | @Vector.cons _ a n' typs' =>
-        let typs:= Vector.cons Type a n' typs' in
-        fun projs S =>
-          (inj_SumType typs Fin.F1 (prim_fst projs S))
-            :: map (lift_SumType a) (to_list' (prim_snd projs) S)
-    end.
-
   
-
-  
-  (* Like a monadic operation
-     `??` in haskell
-   *)
-  Definition iapp {n:nat} {S:Type} {types:Vector.t Type n}
-    (fM: ilist (B:= fun T:Type => S -> T) types) (s:S)
-    : ilist (B:= id) types:=
-    @imap Type (fun T:Type => S -> T) id (fun _ f => f s) _ _ fM.
-        
   Fixpoint ito_list {n:nat} {types:Vector.t Type n}:
     ilist (B:=id) types -> list (SumType types):=
     match types as typs return
@@ -459,52 +415,308 @@ Section PermutationToList.
           (inj_SumType typs Fin.F1 (prim_fst ils))
             :: map (lift_SumType a) (ito_list (prim_snd ils))
     end.
-
-  Definition to_list {n:nat} {S:Type} {types:Vector.t Type n}
-    (projs: ilist (B:= fun T:Type => S -> T) types):= fun s => ito_list (iapp projs s).
   
+  Definition filter_decode {S B} (op:option S): DecodeM (S * B) B:=
+    (fun t' ctxD =>
+       match op with
+       | Some s => Some (s, t', ctxD)
+       | _ =>  None
+       end).
+
+  
+  Definition sortType: forall {m : nat} {types : Vector.t Type m}, list (SumType types) -> option (ilist(B:=id) types). 
+  Admitted.
+  Definition decode_filter {m} {types : Vector.t Type m} (v : list (SumType types)):
+    DecodeM ((ilist(B:=id) types) * ByteString)  ByteString:= (filter_decode (sortType v)).
+
+  
+  Definition decidesOpt {a} (op: option a) (predicate: a -> Prop):=
+    Ifopt op as s Then predicate s Else forall s, ~ predicate s.
+  
+  
+  Definition decidesOptBool {a} (op: option a) (b: a -> bool) (predicate: a -> Prop):=
+    Ifopt op as s Then (General.decides (b s) (predicate s)) Else forall s, ~ predicate s.
+
+  
+  
+  
+  Definition filter_decode_bool {S B} (op:option S) (b:S -> bool) : DecodeM (S * B) B:=
+    (fun t' ctxD =>
+       match op with
+       | Some s => if (b s) then Some (s, t', ctxD) else None
+       | _ =>  None
+       end).
+
+  
+  (** *Comment this one*)
+  (* eapply CorrectDecoderEmpty. *)
+  
+  Corollary CorrectDecoderEmptyOptBool {S T}
+    : forall (monoid : Monoid T)
+        (Source_Predicate : S -> Prop)
+        (decode_inv : CacheDecode -> Prop)
+        (op : option S) (b: S-> bool),
+      (forall s', Ifopt op as s Then Source_Predicate s' -> s' = s Else True) ->
+      decidesOptBool op b Source_Predicate 
+      -> CorrectDecoder
+          monoid
+          Source_Predicate
+          Source_Predicate
+          eq
+          empty_Format
+          (filter_decode_bool op b)
+          decode_inv
+          empty_Format.
+  Admitted.
+  
+  Corollary CorrectDecoderEmptyOpt {S T}
+    : forall (monoid : Monoid T)
+        (Source_Predicate : S -> Prop)
+        (decode_inv : CacheDecode -> Prop)
+        (op : option S),
+      (forall s', Ifopt op as s Then Source_Predicate s' -> s' = s Else True) ->
+      decidesOpt op Source_Predicate 
+      -> CorrectDecoder
+          monoid
+          Source_Predicate
+          Source_Predicate
+          eq
+          empty_Format
+          (filter_decode op)
+          decode_inv
+          empty_Format.
+  Proof.
+    intros.
+    destruct op.
+    - eapply ExtractViewFrom; eauto; unfold empty_Format; eauto.
+    - Transparent CorrectDecoder.
+      unfold CorrectDecoder, empty_Format; split. intros.
+      + elimtype False; eapply H0. eauto.
+      + discriminate.
+  Qed.
+
+  
+  Lemma sortType_Permutation_inverse:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ls : list (SumType types))
+      (ils : ilist types),
+      Permutation (ito_list ils) ls ->
+      sortType ls = Some ils.
+  Admitted.
+
+  
+  Lemma Permutation_sortType_inverse:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ls : list (SumType types))
+      (ils : ilist types),
+      sortType ls = Some ils -> Permutation (ito_list ils) ls.
+  Admitted.
+
+
+  Definition bothOpt {A: Type} (opt:option A) (b: A -> bool): option A:=
+        (match opt with
+             | Some s => if b s then Some s else None
+             | None   => None 
+            end).
+
+      Lemma decidesOpt_and:
+        forall {A} (b: A -> bool) (opt: option A) (source_pred: Prop) (option_pred: A -> Prop),
+          (forall s, option_pred s -> General.decides (b s) source_pred) ->
+          decidesOpt opt option_pred -> 
+          decidesOpt (bothOpt opt b) (fun x => source_pred /\ option_pred x). 
+      Proof.
+        intros.
+        destruct opt eqn:Heqopt; simpl.
+        - destruct (b) eqn:Heqb; simpl.
+          + split; eauto.
+            eapply H in H0. rewrite Heqb in H0. assumption.
+          + intros s [? ?].
+            eapply H in H0.
+            rewrite Heqb in H0.
+            eauto.
+        - intros ? []; eauto.
+          eapply H0; eauto.
+      Qed.
+      
+  Lemma sort_list_SumType_Correct_Decoder:
+    forall n (types: Vector.t Type n) cache_inv v1 b source_pred,
+      CorrectDecoder ByteStringQueueMonoid (fun ils : ilist types => source_pred /\ Permutation (ito_list ils) v1)
+        (fun ils : ilist types => source_pred /\ Permutation (ito_list ils) v1) eq empty_Format 
+        (filter_decode  (bothOpt (sortType v1) b)) cache_inv empty_Format.
+  Proof.
+    intros.
+    eapply CorrectDecoderEmptyOpt; cycle 1.
+    - remember (fun ils => Permutation (ito_list ils) v1) as Blah.
+      assert (HH: (fun ils => source_pred /\ Permutation (ito_list ils) v1) = fun ils => source_pred /\  Blah ils).
+      { subst Blah; reflexivity. }
+      rewrite HH.
+      eapply decidesOpt_and.
+  Admitted.
+  (*
+    - intros.
+      destruct (sortType v1) eqn:HSTv1; simpl.
+      + intros [? Hperm].
+        clear - HSTv1 Hperm.
+        eapply sortType_Permutation_inverse in Hperm.
+        rewrite Hperm in HSTv1; inversion HSTv1; reflexivity.
+      + constructor.
+    - 
+            
+            
+      destruct (sortType v1) eqn:HSTv1; simpl.
+      + simpl.
+        eapply Permutation_sortType_inverse; auto.
+      + intros s Hs.
+        eapply sortType_Permutation_inverse in Hs. rewrite Hs in HSTv1; inversion HSTv1.
+  Qed.
+*)
+
+  Lemma sort_list_SumType_Correct_Decoder':
+    forall n (types: Vector.t Type n) cache_inv v1,
+      CorrectDecoder ByteStringQueueMonoid (fun ils : ilist types => Permutation (ito_list ils) v1)
+        (fun ils : ilist types => Permutation (ito_list ils) v1) eq empty_Format 
+        (filter_decode  (sortType v1)) cache_inv empty_Format.
+  Proof.
+    intros.
+    eapply CorrectDecoderEmptyOpt; cycle 1.
+    - intros. 
+      destruct (sortType v1) eqn:HSTv1; simpl.
+      + apply Permutation_sortType_inverse; assumption.
+      + intros ** ?.
+        eapply sortType_Permutation_inverse in H.
+        rewrite H in HSTv1; discriminate.
+    - destruct (sortType v1) eqn:HSTv1; simpl; try tauto.
+      intros.
+      eapply sortType_Permutation_inverse in H.
+      rewrite H in HSTv1. inversion HSTv1; reflexivity.
+  Qed.
+
+
+  
+End List2Ilist.
+          
+
+
+
+Section ListPermutations.
+  (* This section defines formats for permutations of ilist.
+     Specifically, we create a format for `ilist(B:=id) types` that:
+     - Translates to `list (SumType types)`
+     - Permutes the list with `Permutation`
+     - Then formats each element in the permuted, heterogeneous list.
+   *)
+
+
+  (* Pramble *)
+  (* Lemma for normalization. Projections and composition can be merged. *)
+  Lemma EquivFormat_compose_projection {T S S' S''}
+    (format_S'' : FormatM S'' T)
+    (f : S -> S')
+    (r : S' -> S'' -> Prop)
+    : EquivFormat (Projection_Format (Compose_Format format_S'' r) f)
+        (Compose_Format format_S'' (fun a b => r (f a) b)).
+  Proof.
+    unfold EquivFormat, refineEquiv, Projection_Format, Compose_Format, compose, Bind2; split;
+      intros ? ?.
+    - rewrite unfold_computes in *.
+      destruct_ex; split_and; eexists.
+      rewrite unfold_computes;  eauto.
+    - rewrite unfold_computes in *.
+      destruct_ex; split_and.
+      rewrite unfold_computes in H0.
+      destruct_ex; split_and.
+      eexists; intuition eauto.
+      subst; eauto.
+  Qed.
+  
+  Ltac normalize_step BitStringT ::=
+    (first
+       [ match goal with
+         | |- EquivFormat ?z ?x => is_evar z; apply EquivFormat_reflexive
+         end; idtac "1"
+       | eapply EquivFormat_trans; [ apply sequence_assoc |  ]
+         ; idtac "3"
+       | eapply EquivFormat_trans;
+         [ apply sequence_mempty with (monoid := BitStringT) |  ]
+         ; idtac "5"
+       | eapply EquivFormat_ComposeIf; intros
+         ; idtac "6"
+       | eapply EquivFormat_trans;
+         [ apply EquivFormat_If_Then_Else with (monoid := BitStringT) |  ]
+         ; idtac "8"
+       | apply EquivFormat_If_Then_Else_Proper
+         ; idtac "9"
+       | eapply EquivFormat_UnderSequence';
+         [ repeat
+             (eapply EquivFormat_trans;
+              [ first [eapply EquivFormat_compose_map; idtac "10.0" |
+                        eapply EquivFormat_compose_projection; idtac "10.1" ] |  ] );
+           apply EquivFormat_reflexive
+         |  ] ; idtac "10"
+       | eapply EquivFormat_Projection_Format_Empty_Format';
+         [ repeat eapply EquivFormat_compose_map;
+           apply EquivFormat_reflexive ] ; idtac "11"
+       | unfold EquivFormat; intros; reflexivity ]); 
+    intros.
+  
+  (** *The Format*)
+  
+  (* | Adds a type to the type of a SumType. Doesn't change the element.
+     Has no computational effect.
+   *)
   
   (* Format for lists of SumTypes. *)
   Definition SumType_list_Format
-             (m : nat) (types : Vector.t Type m)
-             (fin_format: FormatM (Fin.t m) ByteString)
-             (formats: ilist (B:= fun T => FormatM T ByteString) types):
+    (m : nat) (types : Vector.t Type m)
+    (fin_format: FormatM (Fin.t m) ByteString)
+    (formats: ilist (B:= fun T => FormatM T ByteString) types):
     FormatM (list (SumType types)) ByteString:=
     format_list (format_IndexedSumType m types formats fin_format).
   
   
   (* Permutation Formats, from lists. *)
   Definition permutation_list_Format
-             (m : nat) (types : Vector.t Type m)
-             (fin_format: FormatM (Fin.t m) ByteString)
-             (formats: ilist (B:= fun T => FormatM T ByteString) types):
+    (m : nat) (types : Vector.t Type m)
+    (fin_format: FormatM (Fin.t m) ByteString)
+    (formats: ilist (B:= fun T => FormatM T ByteString) types):
     FormatM (list (SumType types)) ByteString:=
     Compose_Format (SumType_list_Format m types fin_format formats)
-                   (Permutation (A:=SumType types)).
+      (Permutation (A:=SumType types)).
   
-  Definition permutation_Format
-             S (m : nat) (types : Vector.t Type m)
-             (projections: ilist (B:= fun T => S -> T) types)
-             (fin_format: FormatM (Fin.t m) ByteString)
-             (formats: ilist (B:= fun T => FormatM T ByteString) types):
-    FormatM S ByteString:=
-    permutation_list_Format m types fin_format formats ◦ to_list projections.
+  Definition permutation_ilist_Format
+    (m : nat) (types : Vector.t Type m)
+    (fin_format: FormatM (Fin.t m) ByteString)
+    (formats: ilist (B:= fun T => FormatM T ByteString) types):
+    FormatM (ilist types) ByteString:=
+    permutation_list_Format m types fin_format formats ◦ ito_list.
 
-  
   (** *The Encoder*)
 
-  Definition Permutation_encoder {n} {types: Vector.t Type n}
-             (S:Type)
-             (projs: ilist (B:= fun T : Type => S -> T) types)
-             (encode_fin:   forall sz0 : nat, AlignedEncodeM sz0)
-             (encoders: ilist (B:= fun T => forall sz, @AlignedEncodeM _ T sz) types)
+  Definition Permutation_ilist_encoder {n} {types: Vector.t Type n}
+    (encode_fin:   forall sz0 : nat, AlignedEncodeM sz0)
+    (encoders: ilist (B:= fun T => forall sz, @AlignedEncodeM _ T sz) types)
     : forall n : nat, AlignedEncodeM n:=
     Projection_AlignedEncodeM
       (AlignedEncodeList (encoder_IndexedSumType encode_fin encoders))
-      (to_list projs).
-    
-  Lemma Permutation_Encoder_Correct:
-    forall S m types projs fin_format formats
+      ito_list.
+
+  
+  (* Since identity is a permutation, composing with permutations
+  refines to no composition*)
+  Lemma refine_compose_permutation:
+    forall A T s env (format1: FormatM (list A) T),
+      refine (Compose_Format (format1) (Permutation (A:=A)) s env)
+        (format1 s env).
+  Proof.
+    unfold refine; intros *; repeat rewrite unfold_computes.
+    unfold Compose_Format.
+    exists s; split ; auto.
+  Qed.
+  
+  Lemma Permutation_ilist_Encoder_Correct:
+    forall m types fin_format formats
       (encode_fin:   forall sz0 : nat, AlignedEncodeM sz0)
       (encoders: ilist (B:= fun T => forall sz, @AlignedEncodeM _ T sz) types),
     forall (Hfin_resi: env_resilient fin_format)
@@ -513,13 +725,13 @@ Section PermutationToList.
       (Hcorrect_fin: CorrectAlignedEncoder fin_format encode_fin)
       (Hcorrect_encoders: IterateBoundedIndex.Iterate_Dep_Type_BoundedIndex
                             (fun idx : Fin.t m => CorrectAlignedEncoder (ith formats idx) (ith encoders idx))),
-      CorrectAlignedEncoder (@permutation_Format S m types projs fin_format formats)
-                            (Permutation_encoder S projs encode_fin encoders).
+      CorrectAlignedEncoder (@permutation_ilist_Format m types fin_format formats)
+        (Permutation_ilist_encoder encode_fin encoders).
   Proof.
     intros.
     pose proof (IterateBoundedIndex.Lookup_Iterate_Dep_Type _ Hformats_resi); clear Hformats_resi.
     
-    unfold permutation_Format, permutation_list_Format, SumType_list_Format.
+    unfold permutation_ilist_Format, permutation_list_Format, SumType_list_Format.
     eapply CorrectAlignedEncoderProjection.
     eapply refine_CorrectAlignedEncoder; try split.
     - eapply refine_compose_permutation.
@@ -535,505 +747,340 @@ Section PermutationToList.
         eapply IndexedSumType_resilience; auto.
       + apply IndexedSumType_Encoder_Correct; assumption.
   Qed.
-
-
   
   (** *The Decoder*)
-Lemma EquivFormat_compose_projection {T S S' S''}
-              (format_S'' : FormatM S'' T)
-              (f : S -> S')
-              (r : S' -> S'' -> Prop)
-          : EquivFormat (Projection_Format (Compose_Format format_S'' r) f)
-                        (Compose_Format format_S'' (fun a b => r (f a) b)).
-        Proof.
-          unfold EquivFormat, refineEquiv, Projection_Format, Compose_Format, compose, Bind2; split;
-            intros ? ?.
-          - rewrite unfold_computes in *.
-            destruct_ex; split_and; eexists.
-            rewrite unfold_computes;  eauto.
-          - rewrite unfold_computes in *.
-            destruct_ex; split_and.
-            rewrite unfold_computes in H0.
-            destruct_ex; split_and.
-            eexists; intuition eauto.
-            subst; eauto.
-        Qed.
 
-        Ltac normalize_step BitStringT ::=
-          (first
-             [ match goal with
-               | |- EquivFormat ?z ?x => is_evar z; apply EquivFormat_reflexive
-               end; idtac "1"
-             | eapply EquivFormat_trans; [ apply sequence_assoc |  ]
-               ; idtac "3"
-             | eapply EquivFormat_trans;
-               [ apply sequence_mempty with (monoid := BitStringT) |  ]
-               ; idtac "5"
-             | eapply EquivFormat_ComposeIf; intros
-               ; idtac "6"
-             | eapply EquivFormat_trans;
-               [ apply EquivFormat_If_Then_Else with (monoid := BitStringT) |  ]
-               ; idtac "8"
-             | apply EquivFormat_If_Then_Else_Proper
-               ; idtac "9"
-             | eapply EquivFormat_UnderSequence';
-               [ repeat
-                   (eapply EquivFormat_trans;
-                    [ first [eapply EquivFormat_compose_map; idtac "10.0" |
-                              eapply EquivFormat_compose_projection; idtac "10.1" ] |  ] );
-                 apply EquivFormat_reflexive
-               |  ] ; idtac "10"
-             | eapply EquivFormat_Projection_Format_Empty_Format';
-               [ repeat eapply EquivFormat_compose_map;
-                 apply EquivFormat_reflexive ] ; idtac "11"
-             | unfold EquivFormat; intros; reflexivity ]); 
-          intros.
-
-Lemma to_list_length:
-  forall S n (types: Vector.t Type n) (s:S) (projs: ilist types) ,
-    (| to_list projs s |) = n.
-Proof.
-  intros ??; induction types.
-  - intros. reflexivity.
-  - intros. simpl.
-    f_equal; rewrite map_length.
-    eapply IHtypes.
-Qed.
-
-
-    Definition permutation_decoder
-      {m S}
-      {types : Vector.t Type m}
-      (fin_decoder : ByteString ->
-                CacheDecode ->
-                option (Fin.t m * ByteString * CacheDecode))
-      (decoders : ilist
-                    (B:= fun T : Type => @DecodeM (T * ByteString) ByteString
-                                        EmptyStore.test_cache) types)
-      (decode2 : list (SumType types) ->
-                 DecodeM (S * ByteString) ByteString)
-       :=
-      (sequence_Decode
+  Lemma ito_list_length:
+    forall n (types: Vector.t Type n) (ils: ilist types) ,
+      (| ito_list ils |) = n.
+  Proof.
+    intros ??; induction types.
+    - intros. reflexivity.
+    - intros. simpl.
+      f_equal; rewrite map_length.
+      eapply IHtypes.
+  Qed.
+  
+  (* This simple decoder, simply reads a list of sumtypes, then passes
+     that into a second decoder to extract the ilist.  The second
+     decoder shouldn't consume any characters and, in practice, it
+     will decode the empty format. However, these facts are not enforced.
+   *)
+  Definition permutation_ilist_decoder
+    {m}
+    {types : Vector.t Type m}
+    (fin_decoder : ByteString ->
+                   CacheDecode ->
+                   option (Fin.t m * ByteString * CacheDecode))
+    (decoders : ilist
+                  (B:= fun T : Type => @DecodeM (T * ByteString) ByteString
+                                      EmptyStore.test_cache) types)
+    (decode2 : list (SumType types) ->
+               DecodeM ((ilist(B:=id) types) * ByteString) ByteString):
+    DecodeM (ilist types * ByteString) ByteString
+    :=
+    (sequence_Decode
        (decode_list (decoder_IndexedSumType fin_decoder decoders)
           m) decode2).
 
 
-    (*
-DecodeM = 
-fun (S T : Type) (store : Cache) => T -> CacheDecode -> option (S * CacheDecode)
-     *)
-      
-(* Easier to proof version.
+  
+  (* Easier to proof version.
   The better version to automate below
- *)
-Lemma Permutation_decoder': 
-  forall (S: Type) m (types: Vector.t Type m)
-    (projs: ilist (B:= fun T => S -> T) types) (cache_inv: CacheDecode -> Prop)
-    (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv
-    (fin_format : FormatM (Fin.t m) ByteString)
-    fin_decoder view_fin
-    (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
-                        CorrectDecoder ByteStringQueueMonoid view_fin 
-                          view_fin eq fin_format fin_decoder cache_inv fin_format)
-    (formats : ilist types)
-    (source_pred : S -> Prop),
-    cache_inv_Property cache_inv
-      (fun P : CacheDecode -> Prop =>
-         fin_cache_inv P /\
-           IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-             (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
-    forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
-          (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
-          (formatrs_decoders_correct :
-            IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-              (fun idx =>
-                 cache_inv_Property cache_inv (Vector.nth cache_invariants idx)
-                 -> CorrectDecoder
-                     ByteStringQueueMonoid
-                     (ith invariants idx)
-                     (ith invariants idx)
-                     eq
-                     (ith formats idx)
-                     (ith decoders idx)
-                     cache_inv
-                     (ith formats idx)))
-        (Hinvariants_ok: forall (s : S) (v : list (SumType types)),
-            source_pred s ->
-            Permutation (to_list projs s) v ->
+   *)
+  Lemma Permutation_ilist_decoder_correct': 
+    forall m (types: Vector.t Type m) cache_inv
+      (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv
+      (fin_format : FormatM (Fin.t m) ByteString)
+      fin_decoder view_fin
+      (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
+                    CorrectDecoder ByteStringQueueMonoid view_fin 
+                      view_fin eq fin_format fin_decoder cache_inv fin_format)
+      (formats : ilist types),
+      cache_inv_Property cache_inv
+        (fun P : CacheDecode -> Prop =>
+           fin_cache_inv P /\
+             IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+               (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
+      forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
+        (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
+        (formatrs_decoders_correct : IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+            (fun idx =>
+               cache_inv_Property cache_inv (Vector.nth cache_invariants idx)
+               -> CorrectDecoder
+                   ByteStringQueueMonoid
+                   (ith invariants idx)
+                   (ith invariants idx)
+                   eq
+                   (ith formats idx)
+                   (ith decoders idx)
+                   cache_inv
+                   (ith formats idx)))
+        (Hinvariants_ok: forall (ils : ilist(B:=id) types) (v : list (SumType types)),
+            Permutation (ito_list ils) v ->
             forall x : SumType types,
-              In x (to_list projs s) ->
+              In x (ito_list ils) ->
               view_fin (SumType_index types x) /\
                 ith invariants (SumType_index types x) (SumType_proj types x))
-        format2 (decode2: list (SumType types) -> DecodeM (S * ByteString) ByteString)
         (P_inv2:(CacheDecode -> Prop) -> Prop)
         (Hcache_inv2: cache_inv_Property cache_inv
-           (fun P : CacheDecode -> Prop =>
-              (fin_cache_inv P /\
-                 IterateBoundedIndex.Iterate_Ensemble_BoundedIndex'
-                   (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\
-                P_inv2 P))
-        (Decoder2_Correct: forall v1 : list (SumType types),
-                     cache_inv_Property cache_inv P_inv2 ->
-                     (| v1 |) = m /\
-                     (forall x : SumType types,
-                      In x v1 ->
-                      view_fin (SumType_index types x) /\
-                      ith invariants (SumType_index types x) (SumType_proj types x)) ->
-                     CorrectDecoder ByteStringQueueMonoid
-                       (fun s : S => source_pred s /\ Permutation (to_list projs s) v1)
-                       (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) eq format2
-                       (decode2 v1) cache_inv format2)
-        ,
-          CorrectDecoder ByteStringQueueMonoid
-                  source_pred source_pred
-                           eq 
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                              ++ format2
-                           )
-                           (permutation_decoder fin_decoder decoders decode2)
-                           cache_inv
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                              ++ format2
-           ).
-Proof.
-  (* Real goal*)
-  unfold permutation_Format, permutation_list_Format, SumType_list_Format.
-  normalize_format. (*10.1, 10, 10*)
-  eapply sequence_Compose_format_decode_correct; cycle 1.
-  intros.
-  (* eapply strengthen_view_pred_Proper; unfold flip, pointwise_relation, impl; cycle 1. *)
-  (* eapply weaken_view_predicate_Proper; unfold flip, pointwise_relation, impl. cycle 1. *)
-  (* eapply weaken_source_pred_Proper; unfold flip, pointwise_relation, impl; simpl; cycle 1. *)
-     (* weaken_view_predicate_Proper
-      strengthen_view_pred_Proper *)
+                        (fun P : CacheDecode -> Prop =>
+                           (fin_cache_inv P /\
+                              IterateBoundedIndex.Iterate_Ensemble_BoundedIndex'
+                                (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\
+                             P_inv2 P)),
+        CorrectDecoder ByteStringQueueMonoid
+          (constant True) (constant True)
+          eq 
+          (@permutation_ilist_Format m types fin_format formats)
+          (permutation_ilist_decoder fin_decoder decoders decode_filter)
+          cache_inv
+          (@permutation_ilist_Format m types fin_format formats).
+  Proof.
+    (* Real goal*)
+    unfold permutation_ilist_Format, permutation_list_Format, SumType_list_Format.
+    normalize_format. (*10.1, 10, 10*)
+
+    eapply sequence_Compose_format_decode_correct; cycle 1.
+    intros.
     
-    (*1*) intros; apply FixList_decode_correct.
-  eapply IndexedSumType_Decoder_Correct; eassumption; eassumption; eassumption.
-  - simpl. intros s v Hsource Hperm.
-    split.
-    + eapply Permutation_length in Hperm.
-      rewrite <- Hperm. 
-      eapply to_list_length. 
-    + intros ??;
-        eapply Hinvariants_ok; eauto. 
-      eapply Permutation_in; [symmetry|];  eassumption.
-  - simpl.
-    eapply Decoder2_Correct.
-  - simpl. simpl.
-    assumption.
-Qed.
+    - (*1*) intros; apply FixList_decode_correct.
+      eapply IndexedSumType_Decoder_Correct; eassumption; eassumption; eassumption.
+    - simpl. intros s v Hsource Hperm.
+      split.
+      + eapply Permutation_length in Hperm.
+        rewrite <- Hperm. 
+        eapply ito_list_length. 
+      + intros ??; eapply Hinvariants_ok; eauto. 
+        eapply Permutation_in; [symmetry|];  eassumption.
+    - intros.
+      eapply weaken_view_predicate_Proper; cycle 1.
+      eapply weaken_source_pred_Proper; cycle 1.
+      eapply sort_list_SumType_Correct_Decoder'.
+       (* sort_list_SumType_Correct_Decoder *)
+      
+      unfold flip, pointwise_relation, impl; simpl; tauto.
+      unfold flip, pointwise_relation, impl; simpl; tauto.
+    - eapply Hcache_inv2.
+  Qed.
 
-(* Some lemmas to modifiy themake the statment amenable to automation*)
+  (* Some lemmas to make the statment amenable for automation*)
 
-Lemma SumType_index_lift:
-  forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
-    (SumType_index (Vector.cons Type h n types) (lift_SumType h y)) =
-      Fin.FS (SumType_index types y).
-Proof.
-  destruct types.
-  - intros; elim y.
-  - reflexivity.
-Qed.
+  Lemma SumType_index_lift:
+    forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
+      (SumType_index (Vector.cons Type h n types) (lift_SumType h y)) =
+        Fin.FS (SumType_index types y).
+  Proof.
+    destruct types.
+    - intros; elim y.
+    - reflexivity.
+  Qed.
 
-Lemma SumType_proj_lift:
-  forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
-    let types':= (Vector.cons Type h n types) in
-    SumType_proj types y ~= SumType_proj types' (lift_SumType h y)
-.
-Proof.
-  destruct types.
-  - intros. elim y.
-  - reflexivity.
-Qed.
+  Lemma SumType_proj_lift:
+    forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
+      let types':= (Vector.cons Type h n types) in
+      SumType_proj types y ~= SumType_proj types' (lift_SumType h y).
+  Proof.
+    destruct types.
+    - intros. elim y.
+    - reflexivity.
+  Qed.
+  
 
-Lemma SumType_proj_in_list:
-  forall { S : Type} {m : nat} (types : Vector.t Type m) (projs : ilist(B:= (fun T : Type => S -> T)) types) s x, 
-    In x (to_list projs s) ->
-    ith projs (SumType_index types x) s = SumType_proj types x.
-Proof.
-  induction types.
-  - intros. elim H.
-  - intros. destruct projs as [pi0 projs].
-    unfold to_list, iapp in H.
-    simpl imap in H.
-    Lemma ito_list_cons:
-      forall {n} {T:Type} {types : Vector.t Type n} (x0: T) (ils: ilist(B:=id) types),  
-        let typs := Vector.cons Type T n types in
-        ito_list (icons x0 ils) =
-          inj_SumType typs Fin.F1 x0 :: map (lift_SumType T) (@ito_list n types ils).
-    Proof. reflexivity. Qed.
+  Lemma In_implies_Iterated:
+    forall n types (ils: ilist types) (pred: Fin.t n -> Prop),
+      IterateBoundedIndex.Iterate_Ensemble_BoundedIndex pred ->
+      (forall (x : SumType types),
+          In x (@ito_list n types ils) ->
+          pred (SumType_index types x)).
+  Proof.
+    intros.
+    eapply IterateBoundedIndex.Iterate_Ensemble_BoundedIndex_equiv in H.
+    instantiate (1:= SumType_index types x) in H.
+    eauto.
+  Qed.
 
-    rewrite ito_list_cons in H. 
-    destruct H; cycle 1.
-    + eapply in_map_iff in H.
-      destruct H as (y &Heqxy & H).
-      eapply IHtypes in H.
-      etransitivity; [rewrite <- Heqxy| reflexivity].
-      assert (LHS_lemma:
-               forall n (types : Vector.t Type n) (h: Type) (y : SumType types) S (s:S) ,
-                 let types':= (Vector.cons Type h n types) in
-                 forall (projs : ilist (B:=fun T : Type => S -> T) types'),
-                   ith projs (SumType_index types' (lift_SumType h y)) s ~=
-                     ith projs (Fin.FS (SumType_index types y)) s).
-      {
-        clear; intros.
-        subst types'.
-        erewrite SumType_index_lift.
-        econstructor.
-      }
-      eapply JMeq_eq.
-      etransitivity.
-      eapply LHS_lemma.
-      simpl.
-      rewrite H.
-
-      eapply SumType_proj_lift.
-
-    + clear IHtypes.
-      rewrite <- H.
-      destruct types; reflexivity.
-Qed.
+  
+  Lemma SumType_in_ilist:
+    forall {m : nat} (types : Vector.t Type m) ils x, 
+      In x (ito_list ils) ->
+      ith ils (SumType_index types x) = SumType_proj types x.
+  Proof.
+    induction types.
+    - intros. elim H.
+    - intros.
+      destruct H; cycle 1.
+      + eapply in_map_iff in H.
+        destruct H as (y &Heqxy & H).
+        eapply IHtypes in H.
+        etransitivity; [rewrite <- Heqxy| reflexivity].
+        eapply JMeq_eq.
+        etransitivity.
 
 
-Lemma In_implies_Iterated:
-  forall n S types (s:S) projs (pred: Fin.t n -> Prop),
-    IterateBoundedIndex.Iterate_Ensemble_BoundedIndex pred ->
-    (forall (x : SumType types),
-        In x (@to_list n S types projs s) ->
-        pred (SumType_index types x)).
-Proof.
-  intros.
-  eapply IterateBoundedIndex.Iterate_Ensemble_BoundedIndex_equiv in H.
-  instantiate (1:= SumType_index types x) in H.
-  eauto.
-Qed.
+        assert (LHS_lemma:
+                 forall n (types : Vector.t Type n) (h: Type) (y : SumType types) ,
+                   let types':= (Vector.cons Type h n types) in
+                   forall  (ils: ilist(B:=id) types'),
+                     ith ils (SumType_index types' (lift_SumType h y)) ~=
+                       ith ils (Fin.FS (SumType_index types y))).
+        {
+          clear; intros.
+          subst types'.
+          erewrite SumType_index_lift.
+          econstructor.
+        }
+        
 
-(* Version of the lemma written for automation. See each hypothesis for details about why it changed*)
-Lemma Permutation_decoder: 
-  forall (S: Type) m (types: Vector.t Type m)
-    (projs: ilist (B:= fun T => S -> T) types) (cache_inv: CacheDecode -> Prop)
-    (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv
-    (fin_format : FormatM (Fin.t m) ByteString)
-    fin_decoder view_fin
-    (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
-                        CorrectDecoder ByteStringQueueMonoid view_fin 
-                          view_fin eq fin_format fin_decoder cache_inv fin_format)
-    (formats : ilist types)
-    (source_pred : S -> Prop),
-    cache_inv_Property cache_inv
-      (fun P : CacheDecode -> Prop =>
-         fin_cache_inv P /\
-           IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-             (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
-    forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
-          (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
-          (formatrs_decoders_correct :
-            IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-              (fun idx =>
-                 cache_inv_Property cache_inv (Vector.nth cache_invariants idx)
-                 -> CorrectDecoder
-                     ByteStringQueueMonoid
-                     (ith invariants idx)
-                     (ith invariants idx)
-                     eq
-                     (ith formats idx)
-                     (ith decoders idx)
-                     cache_inv
-                     (ith formats idx)))
+        eapply LHS_lemma.
+        simpl.
+        rewrite H.
+
+        eapply SumType_proj_lift.
+
+      + clear IHtypes.
+        rewrite <- H.
+        destruct types; reflexivity.
+  Qed.
+
+
+  
+  (* Version of the lemma written for automation. See each hypothesis for details about why it changed*)
+  Lemma Permutation_ilist_decoder_correct: 
+    
+    forall m (types: Vector.t Type m) cache_inv
+      (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv
+      (fin_format : FormatM (Fin.t m) ByteString)
+      fin_decoder view_fin
+      (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
+                    CorrectDecoder ByteStringQueueMonoid view_fin 
+                      view_fin eq fin_format fin_decoder cache_inv fin_format)
+      (formats : ilist types),
+      cache_inv_Property cache_inv
+        (fun P : CacheDecode -> Prop =>
+           fin_cache_inv P /\
+             IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+               (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
+      forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
+        (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
+        (formatrs_decoders_correct : IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+            (fun idx =>
+               cache_inv_Property cache_inv (Vector.nth cache_invariants idx)
+               -> CorrectDecoder
+                   ByteStringQueueMonoid
+                   (ith invariants idx)
+                   (ith invariants idx)
+                   eq
+                   (ith formats idx)
+                   (ith decoders idx)
+                   cache_inv
+                   (ith formats idx)))
+        
         (* Change the hypothesis to use
         `Iterate_Ensemble_BoundedIndex`, so it can easily be unfolded
         into the list of subproofs. *)
-        (Hinvariants_ok: forall (s : S) (v : list (SumType types)),
-            source_pred s ->
-            Permutation (to_list projs s) v ->
+        (Hinvariants_ok: forall (ils : ilist types) (v : list (SumType types)),
+            Permutation (ito_list ils) v ->
             IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
               (fun idx =>
                  view_fin idx /\
-                   ith invariants idx (ith projs idx s)
-              ))
-        format2 (decode2: list (SumType types) -> DecodeM (S * ByteString) ByteString)
+                   ith invariants idx (ith ils idx)
+        ))
         (P_inv2:(CacheDecode -> Prop) -> Prop)
         (Hcache_inv2: cache_inv_Property cache_inv
-           (fun P : CacheDecode -> Prop =>
-              (fin_cache_inv P /\
-                 IterateBoundedIndex.Iterate_Ensemble_BoundedIndex'
-                   (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\
-                P_inv2 P))
-        (Decoder2_Correct: forall v1 : list (SumType types),
-                     cache_inv_Property cache_inv P_inv2 ->
-                     (| v1 |) = m /\
-                     (forall x : SumType types,
-                      In x v1 ->
-                      view_fin (SumType_index types x) /\
-                      ith invariants (SumType_index types x) (SumType_proj types x)) ->
-                     CorrectDecoder ByteStringQueueMonoid
-                       (fun s : S => source_pred s /\ Permutation (to_list projs s) v1)
-                       (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) eq format2
-                       (decode2 v1) cache_inv format2)
-        ,
-          CorrectDecoder ByteStringQueueMonoid
-                  source_pred source_pred
-                           eq 
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                              ++ format2
-                           )
-                           (permutation_decoder fin_decoder decoders decode2)
-                           cache_inv
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                              ++ format2
-                           ).
-Proof.
-  intros.
-  eapply Permutation_decoder'; try eassumption.
-  - (* Turn a quantification of every item in a list with `In`, to an
-    iteration ver all the elements with
-    `Iterate_Ensemble_BoundedIndex`*)
-
+                        (fun P : CacheDecode -> Prop =>
+                           (fin_cache_inv P /\
+                              IterateBoundedIndex.Iterate_Ensemble_BoundedIndex'
+                                (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\
+                             P_inv2 P)),
+        CorrectDecoder ByteStringQueueMonoid
+          (constant True) (constant True)
+          eq 
+          (@permutation_ilist_Format m types fin_format formats)
+          (permutation_ilist_decoder fin_decoder decoders decode_filter)
+          cache_inv
+          (@permutation_ilist_Format m types fin_format formats).
+  Proof.
+    intros.
+    eapply Permutation_ilist_decoder_correct'; try eassumption.
+    - (* Turn a quantification of every item in a list with `In`, to an
+         iteration ver all the elements with
+         `Iterate_Ensemble_BoundedIndex`*)
       clear - Hinvariants_ok.
       intros.
-      remember (fun idx => view_fin (idx) /\ ith invariants (idx) (ith projs idx s)) as pred.
-      replace (SumType_proj types x) with (ith projs (SumType_index types x) s); cycle 1.
-      { revert H1.
-        eapply SumType_proj_in_list.
+      (* remember (fun idx => view_fin (idx) /\ ith invariants (idx) (ith ils idx)) as pred. *)
+      replace (SumType_proj types x) with (ith ils (SumType_index types x)); cycle 1.
+      { revert H0. eapply SumType_in_ilist.
       }
-      cut ((fun y => view_fin y /\ ith invariants y (ith projs y s)) (SumType_index types x)); [simpl; auto|].
+      cut ((fun y => view_fin y /\ ith invariants y (ith ils y)) (SumType_index types x)); [simpl; auto|].
       eapply In_implies_Iterated; eauto.
-Qed.
+  Qed.
+
+End ListPermutations.
 
 
+
+Section PermutationToList.
+  (* In this section we wrap the Permutation format around a way to *)
 
   
-End PermutationToList.
-
-Section Permutation.
-(* We simplify the decoder to finish with a ilist, so we can ensure it
-can be built back into an S*)
-
-   
+  (** *The Format*)
   
-  (** *The decoder*)
-  Definition BindSum {A B err} (a_sum: A + err) (k: A -> B + err): B + err:=
-    match a_sum with
-    | inl a =>
-        match k a with
-        | inl b => inl b
-        | inr e => inr e
-        end
-    | inr e => inr e
-    end.
-  Definition BindOpt2 {B1 B2 C} := fun a b => @BindOpt (B1*B2) C a (fun x => b (fst x) (snd x)).  
-  Delimit Scope option_scope with option.
-  Notation "x <- y ; z" := (BindOpt y%option (fun x => z%option))
-                           (at level 81, right associativity,
-                             format "'[v' x  <-  y ; '/' z ']'") : option_scope.
-  Notation "`( a , b ) <- c ; k" :=
-    (BindOpt2 c%option (fun a b => k%option))
-      (at level 81, right associativity,
-        format "'[v' `( a ,  b )  <-  c ; '/' k ']'") : option_scope.
-  Declare Scope sum_scope.
-  Notation "x <- y ; z" := (BindSum y (fun x => z))
-                           (at level 81, right associativity,
-                            format "'[v' x  <-  y ; '/' z ']'") : sum_scope.
-  Delimit Scope sum_scope with sum.
-  Open Scope option_scope.
-
-
-  (*| If the element has the first type, it returns the element.
-      Otherwise, it returns the element in a lowered SumType.
-      Specifically, if removes the first type from the Sum.
+  
+  (* Like a monadic operation
+     `??` in haskell
    *)
-  Fixpoint extract_lowest
-    {m: nat} {T: Type} {types : Vector.t Type m}:
-    let types' := Vector.cons Type T _ types in
-    SumType types' -> (SumType types + T):=    
-  (* Proof. *)
-  (*   simpl; intros. *)
-  (*   destruct types. *)
-  (*   - left; exact X. *)
-  (*   - destruct X. *)
-  (*     + left. exact t. *)
-  (*     + right; eauto. *)
-  (* Defined. *)
-    match
-      types as t in (Vector.t _ n)
-      return (SumType (Vector.cons Type T n t) -> SumType t + T)
-    with
-    | @Vector.nil _ => fun a => inr a
-    | @Vector.cons _ h n types0 =>
-        fun a => match a with
-          | inl a => inr a
-          | inr y => inl y
-          end
-    end.
+  Definition iapp {n:nat} {S:Type} {types:Vector.t Type n}
+    (fM: ilist (B:= fun T:Type => S -> T) types) (s:S)
+    : ilist (B:= id) types:=
+    @imap Type (fun T:Type => S -> T) id (fun _ f => f s) _ _ fM.
+  
+  Definition to_list {n:nat} {S:Type} {types:Vector.t Type n}
+    (projs: ilist (B:= fun T:Type => S -> T) types):= fun s => ito_list (iapp projs s).
+  
+  Definition permutation_Format
+    S (m : nat) (types : Vector.t Type m)
+    (projections: ilist (B:= fun T => S -> T) types)
+    (fin_format: FormatM (Fin.t m) ByteString)
+    (formats: ilist (B:= fun T => FormatM T ByteString) types):
+    FormatM S ByteString:=
+    permutation_ilist_Format m types fin_format formats ◦ iapp projections.
 
-  Fixpoint mapOpt {A B} (f: A -> option B) (ls: list A): option (list B):=
-    match ls with
-    | [] => Some []
-    | x::ls' =>
-        y <- f x;
-        ls_b' <- mapOpt f ls';
-        Some (y :: ls_b')
-  end.
-  Fixpoint mapSum {A B T} (f: A -> B + T) (ls: list A): (list B + T):=
-    match ls with
-    | [] => inl []
-    | x::ls' =>
-        (y <- f x;
-        ls_b' <- mapSum f ls';
-        inl (y :: ls_b'))%sum
-    end.
+  (** *The Encoder*)
+  
+  Definition Permutation_encoder {n} {types: Vector.t Type n}
+    (S:Type)
+    (projs: ilist (B:= fun T : Type => S -> T) types)
+    (encode_fin:   forall sz0 : nat, AlignedEncodeM sz0)
+    (encoders: ilist (B:= fun T => forall sz, @AlignedEncodeM _ T sz) types)
+    : forall n : nat, AlignedEncodeM n:=
+    Projection_AlignedEncodeM (Permutation_ilist_encoder encode_fin encoders) (iapp projs).
+  
+  Lemma Permutation_Encoder_Correct:
+    forall S m types projs fin_format formats
+      (encode_fin:   forall sz0 : nat, AlignedEncodeM sz0)
+      (encoders: ilist (B:= fun T => forall sz, @AlignedEncodeM _ T sz) types),
+    forall (Hfin_resi: env_resilient fin_format)
+      (Hformats_resi: IterateBoundedIndex.Iterate_Dep_Type_BoundedIndex
+                        (fun idx : Fin.t m => env_resilient (ith formats idx)))
+      (Hcorrect_fin: CorrectAlignedEncoder fin_format encode_fin)
+      (Hcorrect_encoders: IterateBoundedIndex.Iterate_Dep_Type_BoundedIndex
+                            (fun idx : Fin.t m => CorrectAlignedEncoder (ith formats idx) (ith encoders idx))),
+      CorrectAlignedEncoder (@permutation_Format S m types projs fin_format formats)
+        (Permutation_encoder S projs encode_fin encoders).
+  Proof.
+    intros.
+    unfold permutation_Format, Permutation_encoder.
+    eapply CorrectAlignedEncoderProjection.
+    eapply Permutation_ilist_Encoder_Correct; auto.
+  Qed.
 
-  (* If any element has the first type, it returns the element.
-     Otherwise, it removes that type from the list.
-   *)
-  Fixpoint lower_SumTypes
-    {m: nat} {T: Type} {types : Vector.t Type m}:
-    let types' := Vector.cons Type T _ types in
-    list (SumType types') -> (list (SumType types) + T):=
-    mapSum extract_lowest.
+
   
-    Fixpoint remove_fst_type
-    {m: nat} {T: Type} {types : Vector.t Type m}
-    (ls: list (SumType (Vector.cons Type T _ types))):
-      option (T * list (SumType types)):=
-      match ls with
-      | [] => None
-      | x :: ls0 =>
-          match extract_lowest x with
-          | inl xx => x_ls' <- remove_fst_type ls0;
-                     Some (fst x_ls', xx :: (snd x_ls'))
-          | inr t => match lower_SumTypes ls0 with
-                    | inl ls' => Some (t, ls')
-                    | inr _ => (* In this case there where two elems of the same type*)
-                        None
-                    end
-           end
-  end.
-  
-  Fixpoint sortType {m} {types : Vector.t Type m}
-    (ls: list (SumType types)): option (ilist (B:=id) types):=
-    match
-    types as t in (Vector.t _ n)
-    return (list (SumType t) -> option (ilist t))
-    with
-    | @Vector.nil _ => constant Some ()
-    | @Vector.cons _ h n types0 =>
-        fun ls0 : list (SumType (Vector.cons Type h n types0)) =>
-          match remove_fst_type ls0 with
-          | Some (t, ls1) =>
-              match sortType ls1 with
-              | Some i => Some {| prim_fst := t; prim_snd := i |}
-              | None => None
-              end
-          | None => None
-          end
-    end ls.
-  
-  Definition permutation_decoder_ilist
+  (** *The Decoder*)
+
+
+  Definition permutation_decoder
     {m S}
     {types : Vector.t Type m}
     (fin_decoder : ByteString ->
@@ -1042,473 +1089,704 @@ can be built back into an S*)
     (decoders : ilist
                   (B:= fun T : Type => @DecodeM (T * ByteString) ByteString
                                       EmptyStore.test_cache) types)
-    (decode2 : ilist (B:=id) types ->
-               DecodeM (S * ByteString) ByteString): DecodeM (S * ByteString) ByteString:=
-    permutation_decoder fin_decoder decoders  (fun x => Ifopt sortType x as ils Then decode2 ils Else (fun  _ _ => None)).  
+    (decode_ilist : list (SumType types) ->
+                    DecodeM (ilist(B:=id) types * ByteString) ByteString)
+    (decode_S : ilist(B:=id) types ->
+                DecodeM (S * ByteString) ByteString):
+    DecodeM (S * ByteString) ByteString:=
+    sequence_Decode (permutation_ilist_decoder fin_decoder decoders decode_ilist) decode_S.
+  
 
+      Lemma ith_iapp:
+        forall S n (types: Vector.t Type n) idx (projs : ilist(B:= fun T => S -> T) types) (s:S),
+          ith (iapp projs s) idx = ith projs idx s.
+      Proof.
+        intros. unfold iapp. rewrite <- ith_imap.
+        reflexivity.
+      Qed.
 
-  (** Correctness lemma *)
-
-        Ltac normalize_step BitStringT ::=
-          (first
-             [ match goal with
-               | |- EquivFormat ?z ?x => is_evar z; apply EquivFormat_reflexive
-               end; idtac "1"
-             | eapply EquivFormat_trans; [ apply sequence_assoc |  ]
-               ; idtac "3"
-             | eapply EquivFormat_trans;
-               [ apply sequence_mempty with (monoid := BitStringT) |  ]
-               ; idtac "5"
-             | eapply EquivFormat_ComposeIf; intros
-               ; idtac "6"
-             | eapply EquivFormat_trans;
-               [ apply EquivFormat_If_Then_Else with (monoid := BitStringT) |  ]
-               ; idtac "8"
-             | apply EquivFormat_If_Then_Else_Proper
-               ; idtac "9"
-             | eapply EquivFormat_UnderSequence';
-               [ repeat
-                   (eapply EquivFormat_trans;
-                    [ first [eapply EquivFormat_compose_map; idtac "10.0" |
-                              eapply EquivFormat_compose_projection; idtac "10.1" ] |  ] );
-                 apply EquivFormat_reflexive
-               |  ] ; idtac "10"
-             | eapply EquivFormat_Projection_Format_Empty_Format';
-               [ repeat eapply EquivFormat_compose_map;
-                 apply EquivFormat_reflexive ] ; idtac "11"
-             | unfold EquivFormat; intros; reflexivity ]); 
-          intros.
-
-Lemma Permutation_decoder_ilist_Correct: 
-  forall (S: Type) m (types: Vector.t Type m)
-    (projs: ilist (B:= fun T => S -> T) types) (cache_inv: CacheDecode -> Prop)
-    (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv
-    (fin_format : FormatM (Fin.t m) ByteString)
-    fin_decoder view_fin
-    (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
-                        CorrectDecoder ByteStringQueueMonoid view_fin 
-                          view_fin eq fin_format fin_decoder cache_inv fin_format)
-    (formats : ilist types)
-    (source_pred : S -> Prop),
-    cache_inv_Property cache_inv
-      (fun P : CacheDecode -> Prop =>
-         fin_cache_inv P /\
-           IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-             (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
-    forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
-          (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
-          (formatrs_decoders_correct :
+  
+  (* Version of the lemma written for automation. See each hypothesis for details about why it changed*)
+  Lemma Permutation_decoder_Correct: 
+    forall (S: Type) m (types: Vector.t Type m)
+      (projs: ilist (B:= fun T => S -> T) types) (cache_inv: CacheDecode -> Prop)
+      (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv
+      (fin_format : FormatM (Fin.t m) ByteString)
+      fin_decoder view_fin
+      (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
+                    CorrectDecoder ByteStringQueueMonoid view_fin 
+                      view_fin eq fin_format fin_decoder cache_inv fin_format)
+      (formats : ilist types)
+      (source_pred : S -> Prop),
+      cache_inv_Property cache_inv
+        (fun P : CacheDecode -> Prop =>
+           fin_cache_inv P /\
+             IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+               (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
+      forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
+        (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
+        (formatrs_decoders_correct :
+          IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+            (fun idx =>
+               cache_inv_Property cache_inv (Vector.nth cache_invariants idx)
+               -> CorrectDecoder
+                   ByteStringQueueMonoid
+                   (ith invariants idx)
+                   (ith invariants idx)
+                   eq
+                   (ith formats idx)
+                   (ith decoders idx)
+                   cache_inv
+                   (ith formats idx)))
+        (Hinvariants_ok:
+          forall (ils : ilist types) (v : list (SumType types)),
+            Permutation (ito_list ils) v ->
             IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-              (fun idx =>
-                 cache_inv_Property cache_inv (Vector.nth cache_invariants idx)
-                 -> CorrectDecoder
-                     ByteStringQueueMonoid
-                     (ith invariants idx)
-                     (ith invariants idx)
-                     eq
-                     (ith formats idx)
-                     (ith decoders idx)
-                     cache_inv
-                     (ith formats idx)))
-        (Hinvariants_ok: forall (s : S) (v : list (SumType types)),
-            source_pred s ->
-            Permutation (to_list projs s) v ->
-            forall x : SumType types,
-              In x (to_list projs s) ->
-              view_fin (SumType_index types x) /\
-                ith invariants (SumType_index types x) (SumType_proj types x))
-        format2 (decode2: ilist types -> DecodeM (S * ByteString) ByteString)
-        (P_inv2:(CacheDecode -> Prop) -> Prop)
-        (Hcache_inv2: cache_inv_Property cache_inv
-           (fun P : CacheDecode -> Prop =>
-              (fin_cache_inv P /\
-                 IterateBoundedIndex.Iterate_Ensemble_BoundedIndex'
-                   (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\
-                P_inv2 P))
+              (fun idx : Fin.t m => view_fin idx /\ ith invariants idx (ith ils idx))
+         )
+        (decode_S: ilist(B:=id) types -> DecodeM (S * ByteString) ByteString)
+        (* (P_inv2: (CacheDecode -> Prop) -> Prop) *)
+        ,
+        forall (Decode_S_correct: forall v1 : ilist types,
+              (* cache_inv_Property cache_inv P_inv2 -> *)
+              CorrectDecoder ByteStringQueueMonoid (fun s : S => source_pred s /\ IsProj (iapp projs) v1 s)
+                (fun s : S => source_pred s /\ IsProj (iapp projs) v1 s) eq empty_Format (decode_S v1) cache_inv empty_Format)
+
         ,
           CorrectDecoder ByteStringQueueMonoid
-                  source_pred source_pred
-                           eq 
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                              ++ format2
-                           )
-                           (permutation_decoder_ilist fin_decoder decoders decode2)
-                           cache_inv
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                              ++ format2
-           ).
-Proof.
-  
-  (* Real goal*)
-  unfold permutation_Format, permutation_list_Format, SumType_list_Format.
-  normalize_format. (*10.1, 10, 10*)
-  eapply sequence_Compose_format_decode_correct; cycle 1.
-  intros.
-  (* eapply strengthen_view_pred_Proper; unfold flip, pointwise_relation, impl; cycle 1. *)
-  (* eapply weaken_view_predicate_Proper; unfold flip, pointwise_relation, impl. cycle 1. *)
-  (* eapply weaken_source_pred_Proper; unfold flip, pointwise_relation, impl; simpl; cycle 1. *)
-     (* weaken_view_predicate_Proper
-      strengthen_view_pred_Proper *)
-    
-  - (*1*) intros; apply FixList_decode_correct.
-    eapply IndexedSumType_Decoder_Correct; eassumption; eassumption; eassumption.
-  - simpl. intros s v Hsource Hperm.
-    split.
-    + eapply Permutation_length in Hperm.
-      rewrite <- Hperm. 
-      eapply to_list_length. 
-    + intros ??;
-        eapply Hinvariants_ok; eauto. 
-      eapply Permutation_in; [symmetry|];  eassumption.
-  - shelve.
-
-    
-  - simpl. simpl.
-    eassumption.
-
-    Unshelve.
-    clear.
-    repeat match goal with
-             [H: _ |- _ ] => revert H
-           end.
-    Definition is_Some {a} (oa: option a): bool :=
-      if oa then true else false.
-
-    Definition decidesOpt {a} (op: option a) (predicate: a -> Prop):=
-      Ifopt op as s Then predicate s Else forall s, ~ predicate s.
-
-    Corollary CorrectDecoderEmptyOpt {S T}
-      : forall (monoid : Monoid T)
-          (Source_Predicate : S -> Prop)
-          (decode_inv : CacheDecode -> Prop)
-          (op : option S),
-        (Ifopt op as s Then forall s', Source_Predicate s' -> s' = s Else True) ->
-        decidesOpt op Source_Predicate 
-        -> CorrectDecoder
-            monoid
-            Source_Predicate
-            Source_Predicate
-            eq
-            empty_Format
-            (filter_decode op)
-            decode_inv
-            empty_Format.
-Proof.
-  intros.
-  destruct op.
-  - eapply ExtractViewFrom; eauto; unfold empty_Format; eauto.
-  - unfold CorrectDecoder, empty_Format; split. intros.
-    + elimtype False; eapply H0. eauto.
-    + discriminate.
-Qed.
-
-      Definition decode_filter {m} {types : Vector.t Type m} (v : list (SumType types)):
-        DecodeM ((ilist(B:=id) types) * ByteString)  ByteString:=
-        filter_decode (sortType v).
-
-
-      Definition first_check_list {m S} {types : Vector.t Type m} (v : list (SumType types))
-        ( decode2 : ilist types -> DecodeM (S * ByteString) ByteString):
-        DecodeM (S * ByteString) ByteString:=
-        sequence_Decode (decode_filter v) decode2.
-    Lemma Blah:
-      forall (S : Type) (m : nat) (types : Vector.t Type m) 
-        (projs : ilist(B:=(fun T : Type => S -> T)) types)
-        (cache_inv : CacheDecode -> Prop)
-        (view_fin : Fin.t m -> Prop) (source_pred : S -> Prop)
-        (invariants : ilist (B:=(fun T : Type => T -> Prop)) types)
-        (decode2 : ilist(B:=id) types -> DecodeM (S * ByteString) ByteString)
-        (P_inv2 : (CacheDecode -> Prop) -> Prop) (v1 : list (SumType types))
-        format2,
-        cache_inv_Property cache_inv P_inv2 ->
-        forall (Decode2_correct: forall v2 : ilist types,
-              cache_inv_Property cache_inv P_inv2 ->
-              (exists s0 : ilist types, v2 = s0 /\ sortType v1 = Some s0) ->
-              CorrectDecoder ByteStringQueueMonoid
-                (fun s : S =>
-                   (source_pred s /\ Permutation (to_list projs s) v1) /\ Some v2 = sortType v1)
-                (fun s : S =>
-                   (source_pred s /\ Permutation (to_list projs s) v1) /\ Some v2 = sortType v1)
-                eq format2 (decode2 v2) cache_inv format2) ,
-          cache_inv_Property cache_inv P_inv2 ->
-          (fun ls : list (SumType types) =>
-             (| ls |) = m /\
-               (forall x : SumType types,
-                   In x ls ->
-                   (fun st : SumType types =>
-                      view_fin (SumType_index types st) /\
-                        ith invariants (SumType_index types st) (SumType_proj types st)) x)) v1 ->
-        CorrectDecoder ByteStringQueueMonoid
-          (fun s : S => source_pred s /\ Permutation (to_list projs s) v1)
-          (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) eq
-          (Compose_Format empty_Format
-             (constant (fun v2 : ilist types => Some v2 = sortType v1)) ++ 
-             format2)
-          (* (Ifopt sortType v1 as ils Then decode2 ils Else constant (constant None)) *)
-          (first_check_list v1 decode2)
-          cache_inv (Compose_Format empty_Format
-                       (constant (fun v2 : ilist types => Some v2 = sortType v1)) ++
-                       format2).
-    Proof.
-      intros.
-      unfold first_check_list.
-      eapply sequence_Compose_format_decode_correct; cycle 1.
-      - simpl; intros.
-        instantiate (1:= fun s => exists s0, s = s0 /\ sortType v1 = Some s0).
-        unshelve eapply CorrectDecoderEmptyOpt.
-        + destruct (sortType v1).
-          * simpl. intros ? [ ? []]. subst; inversion H4; reflexivity.
-          * constructor.
-        + destruct (sortType v1).
-          * simpl. eexists; split; reflexivity.
-          * simpl. intros ? [? []]. inversion H4.
-      - simpl; intros. exists v; split; eauto.
-      - simpl. eassumption. (* Hypothesis of the next format. *)
-      - unfold cache_inv_Property in *; split; eauto.
-    Qed.
-
+            source_pred source_pred
+            eq 
+            (@permutation_Format
+               S m types projs fin_format formats
+            )
+            (permutation_decoder fin_decoder decoders decode_filter decode_S)
+            cache_inv
+            (@permutation_Format
+               S m types projs fin_format formats
+            ).
+  Proof.
     intros.
-    eapply format_decode_correct_refineEquiv_Proper.
-    { instantiate (1 := (Compose_Format empty_Format
-                       (constant (fun v2 : ilist types => Some v2 = sortType v1)) ++
-                       format2)).
-      unfold flip; simpl.
-      unfold EquivFormat, refineEquiv; intros; simpl.
-Admitted.
+    unfold permutation_Format, permutation_decoder.
+
+    (* add an empty format at the end without joining the projections. *)
+    Opaque permutation_ilist_Format.
+    normalize_format.
+    Transparent permutation_ilist_Format.
+
+    eapply format_sequence_correct; eauto; cycle 1.
+    - intros.
+      eapply @Permutation_ilist_decoder_correct; eauto.
+
+      (* cache_invariants *)
+      unfold cache_inv_Property in *; simpl.
+      split_and.
+      repeat split; eauto.
+    - simpl; tauto.
+    - unfold cache_inv_Property in *; simpl.
+      split_and.
+      repeat split; auto.
+
+      (* This could be solve by some of the hypothesis we already have
+      (e.g. `H0 : fin_cache_inv cache_inv`). But conceptually it
+      should be trivial. *)
+      (instantiate (1 := constant True)); constructor.
+  Qed.
       
+End PermutationToList.
 
-Lemma Permutation_decoder'': 
-  forall (S: Type) m (types: Vector.t Type m)
-    (projs: ilist (B:= fun T => S -> T) types) (cache_inv: CacheDecode -> Prop)
-    (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv
-    (fin_format : FormatM (Fin.t m) ByteString)
-    fin_decoder view_fin
-    (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
-                        CorrectDecoder ByteStringQueueMonoid view_fin 
-                          view_fin eq fin_format fin_decoder cache_inv fin_format)
-    (formats : ilist types)
-    (source_pred : S -> Prop),
-    cache_inv_Property cache_inv
-      (fun P : CacheDecode -> Prop =>
-         fin_cache_inv P /\
-           IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-             (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
-    forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
-          (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
-          (formatrs_decoders_correct :
-            IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-              (fun idx =>
-                 cache_inv_Property cache_inv (Vector.nth cache_invariants idx)
-                 -> CorrectDecoder
-                     ByteStringQueueMonoid
-                     (ith invariants idx)
-                     (ith invariants idx)
-                     eq
-                     (ith formats idx)
-                     (ith decoders idx)
-                     cache_inv
-                     (ith formats idx)))
-        (Hinvariants_ok: forall (s : S) (v : list (SumType types)),
-            source_pred s ->
-            Permutation (to_list projs s) v ->
-            forall x : SumType types,
-              In x (to_list projs s) ->
-              view_fin (SumType_index types x) /\
-                ith invariants (SumType_index types x) (SumType_proj types x))
-        format2 (decode2: list (SumType types) -> DecodeM (S * ByteString) ByteString)
-        (P_inv2:(CacheDecode -> Prop) -> Prop)
-        (Restablish:  ilist(B:=id) types -> S)
-        (Hcache_inv2: cache_inv_Property cache_inv
-           (fun P : CacheDecode -> Prop =>
-              (fin_cache_inv P /\
-                 IterateBoundedIndex.Iterate_Ensemble_BoundedIndex'
-                   (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\
-                P_inv2 P))
-        (Decoder2_Correct: forall v1 : list (SumType types),
-                     cache_inv_Property cache_inv P_inv2 ->
-                     (| v1 |) = m /\
-                     (forall x : SumType types,
-                      In x v1 ->
-                      view_fin (SumType_index types x) /\
-                      ith invariants (SumType_index types x) (SumType_proj types x)) ->
-                     CorrectDecoder ByteStringQueueMonoid
-                       (fun s : S => source_pred s /\ Permutation (to_list projs s) v1)
-                       (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) eq format2
-                       (decode2 v1) cache_inv format2)
-        ,
-          CorrectDecoder ByteStringQueueMonoid
-                  source_pred source_pred
-                           eq 
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                           )
-                           (permutation_decoder fin_decoder decoders decode2)
-                           cache_inv
-                           (@permutation_Format
-                              S m types projs fin_format formats
-                           ).
-Proof.
-  intros.
-  (* add empty*)
-  eapply format_decode_correct_refineEquiv_Proper.
-  unfold flip; simpl.
-  Lemma EquivFormat_sym {S T cach}:
-    Symmetric (@EquivFormat S T cach).
-  Admitted.
-  eapply EquivFormat_sym, sequence_mempty'.
+
+
+(* Section Permutation. *)
+(*   (* We simplify the decoder to finish with a ilist, so we can ensure it *)
+(* can be built back into an S*) *)
 
   
-  (* Real goal*)
-  unfold permutation_Format, permutation_list_Format, SumType_list_Format.
-  normalize_format. (*10.1, 10, 10*)
-  eapply sequence_Compose_format_decode_correct; cycle 1.
-  intros.
-  (* eapply strengthen_view_pred_Proper; unfold flip, pointwise_relation, impl; cycle 1. *)
-  (* eapply weaken_view_predicate_Proper; unfold flip, pointwise_relation, impl. cycle 1. *)
-  (* eapply weaken_source_pred_Proper; unfold flip, pointwise_relation, impl; simpl; cycle 1. *)
-     (* weaken_view_predicate_Proper
-      strengthen_view_pred_Proper *)
+  
+(*   (** *The decoder*) *)
+(*   Definition BindSum {A B err} (a_sum: A + err) (k: A -> B + err): B + err:= *)
+(*     match a_sum with *)
+(*     | inl a => *)
+(*         match k a with *)
+(*         | inl b => inl b *)
+(*         | inr e => inr e *)
+(*         end *)
+(*     | inr e => inr e *)
+(*     end. *)
+(*   Definition BindOpt2 {B1 B2 C} := fun a b => @BindOpt (B1*B2) C a (fun x => b (fst x) (snd x)).   *)
+(*   Delimit Scope option_scope with option. *)
+(*   Notation "x <- y ; z" := (BindOpt y%option (fun x => z%option)) *)
+(*                              (at level 81, right associativity, *)
+(*                                format "'[v' x  <-  y ; '/' z ']'") : option_scope. *)
+(*   Notation "`( a , b ) <- c ; k" := *)
+(*     (BindOpt2 c%option (fun a b => k%option)) *)
+(*       (at level 81, right associativity, *)
+(*         format "'[v' `( a ,  b )  <-  c ; '/' k ']'") : option_scope. *)
+(*   Declare Scope sum_scope. *)
+(*   Notation "x <- y ; z" := (BindSum y (fun x => z)) *)
+(*                              (at level 81, right associativity, *)
+(*                                format "'[v' x  <-  y ; '/' z ']'") : sum_scope. *)
+(*   Delimit Scope sum_scope with sum. *)
+(*   Open Scope option_scope. *)
+
+
+(*   (*| If the element has the first type, it returns the element. *)
+(*       Otherwise, it returns the element in a lowered SumType. *)
+(*       Specifically, if removes the first type from the Sum. *)
+(*    *) *)
+(*   Fixpoint extract_lowest *)
+(*     {m: nat} {T: Type} {types : Vector.t Type m}: *)
+(*     let types' := Vector.cons Type T _ types in *)
+(*     SumType types' -> (SumType types + T):=     *)
+(*     (* Proof. *) *)
+(*     (*   simpl; intros. *) *)
+(*     (*   destruct types. *) *)
+(*     (*   - left; exact X. *) *)
+(*     (*   - destruct X. *) *)
+(*     (*     + left. exact t. *) *)
+(*     (*     + right; eauto. *) *)
+(*     (* Defined. *) *)
+(*     match *)
+(*       types as t in (Vector.t _ n) *)
+(*       return (SumType (Vector.cons Type T n t) -> SumType t + T) *)
+(*     with *)
+(*     | @Vector.nil _ => fun a => inr a *)
+(*     | @Vector.cons _ h n types0 => *)
+(*         fun a => match a with *)
+(*               | inl a => inr a *)
+(*               | inr y => inl y *)
+(*               end *)
+(*     end. *)
+
+(*   Fixpoint mapOpt {A B} (f: A -> option B) (ls: list A): option (list B):= *)
+(*     match ls with *)
+(*     | [] => Some [] *)
+(*     | x::ls' => *)
+(*         y <- f x; *)
+(*   ls_b' <- mapOpt f ls'; *)
+(*   Some (y :: ls_b') *)
+(*   end. *)
+(*   Fixpoint mapSum {A B T} (f: A -> B + T) (ls: list A): (list B + T):= *)
+(*     match ls with *)
+(*     | [] => inl [] *)
+(*     | x::ls' => *)
+(*         (y <- f x; *)
+(*          ls_b' <- mapSum f ls'; *)
+(*          inl (y :: ls_b'))%sum *)
+(*     end. *)
+
+(*   (* If any element has the first type, it returns the element. *)
+(*      Otherwise, it removes that type from the list. *)
+(*    *) *)
+(*   Fixpoint lower_SumTypes *)
+(*     {m: nat} {T: Type} {types : Vector.t Type m}: *)
+(*     let types' := Vector.cons Type T _ types in *)
+(*     list (SumType types') -> (list (SumType types) + T):= *)
+(*     mapSum extract_lowest. *)
+  
+(*   Fixpoint remove_fst_type *)
+(*     {m: nat} {T: Type} {types : Vector.t Type m} *)
+(*     (ls: list (SumType (Vector.cons Type T _ types))): *)
+(*     option (T * list (SumType types)):= *)
+(*     match ls with *)
+(*     | [] => None *)
+(*     | x :: ls0 => *)
+(*         match extract_lowest x with *)
+(*         | inl xx => x_ls' <- remove_fst_type ls0; *)
+(*   Some (fst x_ls', xx :: (snd x_ls')) *)
+(* | inr t => match lower_SumTypes ls0 with *)
+(*           | inl ls' => Some (t, ls') *)
+(*           | inr _ => (* In this case there where two elems of the same type*) *)
+(*               None *)
+(*           end *)
+(*   end *)
+(*   end. *)
+  
+(*   Fixpoint sortType {m} {types : Vector.t Type m} *)
+(*     (ls: list (SumType types)): option (ilist (B:=id) types):= *)
+(*     match *)
+(*       types as t in (Vector.t _ n) *)
+(*       return (list (SumType t) -> option (ilist t)) *)
+(*     with *)
+(*     | @Vector.nil _ => constant Some () *)
+(*     | @Vector.cons _ h n types0 => *)
+(*         fun ls0 : list (SumType (Vector.cons Type h n types0)) => *)
+(*           match remove_fst_type ls0 with *)
+(*           | Some (t, ls1) => *)
+(*               match sortType ls1 with *)
+(*               | Some i => Some {| prim_fst := t; prim_snd := i |} *)
+(*               | None => None *)
+(*               end *)
+(*           | None => None *)
+(*           end *)
+(*     end ls. *)
+  
+(*   Definition permutation_decoder_ilist *)
+(*     {m S} *)
+(*     {types : Vector.t Type m} *)
+(*     (fin_decoder : ByteString -> *)
+(*                    CacheDecode -> *)
+(*                    option (Fin.t m * ByteString * CacheDecode)) *)
+(*     (decoders : ilist *)
+(*                   (B:= fun T : Type => @DecodeM (T * ByteString) ByteString *)
+(*                                       EmptyStore.test_cache) types) *)
+(*     (decode2 : ilist (B:=id) types -> *)
+(*                DecodeM (S * ByteString) ByteString): DecodeM (S * ByteString) ByteString:= *)
+(*     permutation_decoder fin_decoder decoders  (fun x => Ifopt sortType x as ils Then decode2 ils Else (fun  _ _ => None)).   *)
+
+
+(*   (** Correctness lemma *) *)
+
+(*   Ltac normalize_step BitStringT ::= *)
+(*     (first *)
+(*        [ match goal with *)
+(*          | |- EquivFormat ?z ?x => is_evar z; apply EquivFormat_reflexive *)
+(*          end; idtac "1" *)
+(*        | eapply EquivFormat_trans; [ apply sequence_assoc |  ] *)
+(*          ; idtac "3" *)
+(*        | eapply EquivFormat_trans; *)
+(*          [ apply sequence_mempty with (monoid := BitStringT) |  ] *)
+(*          ; idtac "5" *)
+(*        | eapply EquivFormat_ComposeIf; intros *)
+(*          ; idtac "6" *)
+(*        | eapply EquivFormat_trans; *)
+(*          [ apply EquivFormat_If_Then_Else with (monoid := BitStringT) |  ] *)
+(*          ; idtac "8" *)
+(*        | apply EquivFormat_If_Then_Else_Proper *)
+(*          ; idtac "9" *)
+(*        | eapply EquivFormat_UnderSequence'; *)
+(*          [ repeat *)
+(*              (eapply EquivFormat_trans; *)
+(*               [ first [eapply EquivFormat_compose_map; idtac "10.0" | *)
+(*                         eapply EquivFormat_compose_projection; idtac "10.1" ] |  ] ); *)
+(*            apply EquivFormat_reflexive *)
+(*          |  ] ; idtac "10" *)
+(*        | eapply EquivFormat_Projection_Format_Empty_Format'; *)
+(*          [ repeat eapply EquivFormat_compose_map; *)
+(*            apply EquivFormat_reflexive ] ; idtac "11" *)
+(*        | unfold EquivFormat; intros; reflexivity ]);  *)
+(*     intros. *)
+
+(*   Lemma Permutation_decoder_ilist_Correct:  *)
+(*     forall (S: Type) m (types: Vector.t Type m) *)
+(*            (projs: ilist (B:= fun T => S -> T) types) (cache_inv: CacheDecode -> Prop) *)
+(*            (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv *)
+(*            (fin_format : FormatM (Fin.t m) ByteString) *)
+(*            fin_decoder view_fin *)
+(*            (fin_correct: cache_inv_Property cache_inv fin_cache_inv -> *)
+(*                          CorrectDecoder ByteStringQueueMonoid view_fin  *)
+(*                            view_fin eq fin_format fin_decoder cache_inv fin_format) *)
+(*            (formats : ilist types) *)
+(*            (source_pred : S -> Prop), *)
+(*       cache_inv_Property cache_inv *)
+(*         (fun P : CacheDecode -> Prop => *)
+(*            fin_cache_inv P /\ *)
+(*              IterateBoundedIndex.Iterate_Ensemble_BoundedIndex *)
+(*                (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) -> *)
+(*       forall (invariants: ilist (B:= fun T : Type => T -> Prop) types) *)
+(*              (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types) *)
+(*              (formatrs_decoders_correct : *)
+(*                IterateBoundedIndex.Iterate_Ensemble_BoundedIndex *)
+(*                  (fun idx => *)
+(*                     cache_inv_Property cache_inv (Vector.nth cache_invariants idx) *)
+(*                     -> CorrectDecoder *)
+(*                          ByteStringQueueMonoid *)
+(*                          (ith invariants idx) *)
+(*                          (ith invariants idx) *)
+(*                          eq *)
+(*                          (ith formats idx) *)
+(*                          (ith decoders idx) *)
+(*                          cache_inv *)
+(*                          (ith formats idx))) *)
+(*              (Hinvariants_ok: forall (s : S) (v : list (SumType types)), *)
+(*                  source_pred s -> *)
+(*                  Permutation (to_list projs s) v -> *)
+(*                  forall x : SumType types, *)
+(*                    In x (to_list projs s) -> *)
+(*                    view_fin (SumType_index types x) /\ *)
+(*                      ith invariants (SumType_index types x) (SumType_proj types x)) *)
+(*              format2 (decode2: ilist types -> DecodeM (S * ByteString) ByteString) *)
+(*              (P_inv2:(CacheDecode -> Prop) -> Prop) *)
+(*              (Hcache_inv2: cache_inv_Property cache_inv *)
+(*                              (fun P : CacheDecode -> Prop => *)
+(*                                 (fin_cache_inv P /\ *)
+(*                                    IterateBoundedIndex.Iterate_Ensemble_BoundedIndex' *)
+(*                                      (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\ *)
+(*                                   P_inv2 P)) *)
+(*       , *)
+(*         CorrectDecoder ByteStringQueueMonoid *)
+(*           source_pred source_pred *)
+(*           eq  *)
+(*           (@permutation_Format *)
+(*              S m types projs fin_format formats *)
+(*              ++ format2 *)
+(*           ) *)
+(*           (permutation_decoder_ilist fin_decoder decoders decode2) *)
+(*           cache_inv *)
+(*           (@permutation_Format *)
+(*              S m types projs fin_format formats *)
+(*              ++ format2 *)
+(*           ). *)
+(*   Proof. *)
     
-    (*1*) intros; apply FixList_decode_correct.
-  eapply IndexedSumType_Decoder_Correct; eassumption; eassumption; eassumption.
-  - simpl. intros s v Hsource Hperm.
-    split.
-    + eapply Permutation_length in Hperm.
-      rewrite <- Hperm. 
-      eapply to_list_length. 
-    + intros ??;
-        eapply Hinvariants_ok; eauto. 
-      eapply Permutation_in; [symmetry|];  eassumption.
-  - simpl. intros.
-    Ltac make_fake t:=
-      let T:= type of t in
-      let x:=fresh in evar (x:T) ; let x':= eval unfold x in x in
-                                     let HH:= fresh "HH" in
-                                     assert (HH: t=x); cycle 1; [unfold x in *; rewrite HH in *| ].
-    make_fake (decode2 v1).
-    unshelve eapply CorrectDecoderEmptyOpt.
-    + { eapply BindOpt.
-      - eapply sortType.
-        exact v1.
-      - exact (fun ils => Some (Restablish ils)). }
-    + destruct (BindOpt (sortType v1) (fun ils => Some (Restablish ils))) eqn:Heq; try solve[constructor].
-      simpl. intros ? [? ?].
-      Lemma ito_list_sortType_roundTrip:
-        forall (m : nat)
-          (types : Vector.t Type m),
-          forall x (v1: list (SumType types)),
-            Permutation (ito_list x) v1 <->
-            sortType v1 = Some x.
-      Admitted.
-      eapply ito_list_sortType_roundTrip in H4.
-      destruct (sortType v1); simpl in *; try solve [inversion Heq].
-      inversion H4; subst i.
-      assert (Restablish_Correct1: forall s, Restablish (iapp projs s) = s) by admit.
-      rewrite Restablish_Correct1 in Heq. inversion Heq; reflexivity.
-    + destruct (sortType v1) eqn:Heq.
-      * simpl.
-        unfold to_list.
-        assert (Restablish_Correct2: forall s, (iapp projs (Restablish s)) = s) by admit.
-        rewrite Restablish_Correct2.
-        split.
-        2: eapply ito_list_sortType_roundTrip; assumption.
-        admit.
-      * simpl. intros ? [].
-        eapply ito_list_sortType_roundTrip in H4.
-        rewrite H4 in Heq; inversion Heq.
-    + admit.
-  - simpl. simpl.
-    assumption.
-Qed.
+(*     (* Real goal*) *)
+(*     unfold permutation_Format, permutation_list_Format, SumType_list_Format. *)
+(*     normalize_format. (*10.1, 10, 10*) *)
+(*     eapply sequence_Compose_format_decode_correct; cycle 1. *)
+(*     intros. *)
+(*     (* eapply strengthen_view_pred_Proper; unfold flip, pointwise_relation, impl; cycle 1. *) *)
+(*     (* eapply weaken_view_predicate_Proper; unfold flip, pointwise_relation, impl. cycle 1. *) *)
+(*     (* eapply weaken_source_pred_Proper; unfold flip, pointwise_relation, impl; simpl; cycle 1. *) *)
+(*     (* weaken_view_predicate_Proper *)
+(*       strengthen_view_pred_Proper *) *)
+    
+(*     - (*1*) intros; apply FixList_decode_correct. *)
+(*       eapply IndexedSumType_Decoder_Correct; eassumption; eassumption; eassumption. *)
+(*     - simpl. intros s v Hsource Hperm. *)
+(*       split. *)
+(*       + eapply Permutation_length in Hperm. *)
+(*         rewrite <- Hperm.  *)
+(*         eapply to_list_length.  *)
+(*       + intros ??; *)
+(*           eapply Hinvariants_ok; eauto.  *)
+(*         eapply Permutation_in; [symmetry|];  eassumption. *)
+(*     - shelve. *)
 
-(* Some lemmas to modifiy themake the statment amenable to automation*)
+      
+(*     - simpl. simpl. *)
+(*       eassumption. *)
 
-Lemma SumType_index_lift:
-  forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
-    (SumType_index (Vector.cons Type h n types) (lift_SumType h y)) =
-      Fin.FS (SumType_index types y).
-Proof.
-  destruct types.
-  - intros; elim y.
-  - reflexivity.
-Qed.
+(*       Unshelve. *)
+(*       clear. *)
+(*       repeat match goal with *)
+(*                [H: _ |- _ ] => revert H *)
+(*              end. *)
+(*       Definition is_Some {a} (oa: option a): bool := *)
+(*         if oa then true else false. *)
 
-Lemma SumType_proj_lift:
-  forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
-    let types':= (Vector.cons Type h n types) in
-    SumType_proj types y ~= SumType_proj types' (lift_SumType h y)
-.
-Proof.
-  destruct types.
-  - intros. elim y.
-  - reflexivity.
-Qed.
+(*       Definition decidesOpt {a} (op: option a) (predicate: a -> Prop):= *)
+(*         Ifopt op as s Then predicate s Else forall s, ~ predicate s. *)
 
-Lemma SumType_proj_in_list:
-  forall { S : Type} {m : nat} (types : Vector.t Type m) (projs : ilist(B:= (fun T : Type => S -> T)) types) s x, 
-    In x (to_list projs s) ->
-    ith projs (SumType_index types x) s = SumType_proj types x.
-Proof.
-  induction types.
-  - intros. elim H.
-  - intros. destruct projs as [pi0 projs].
-    unfold to_list, iapp in H.
-    simpl imap in H.
-    Lemma ito_list_cons:
-      forall {n} {T:Type} {types : Vector.t Type n} (x0: T) (ils: ilist(B:=id) types),  
-        let typs := Vector.cons Type T n types in
-        ito_list (icons x0 ils) =
-          inj_SumType typs Fin.F1 x0 :: map (lift_SumType T) (@ito_list n types ils).
-    Proof. reflexivity. Qed.
+(*       Corollary CorrectDecoderEmptyOpt {S T} *)
+(*         : forall (monoid : Monoid T) *)
+(*             (Source_Predicate : S -> Prop) *)
+(*             (decode_inv : CacheDecode -> Prop) *)
+(*             (op : option S), *)
+(*           (Ifopt op as s Then forall s', Source_Predicate s' -> s' = s Else True) -> *)
+(*           decidesOpt op Source_Predicate  *)
+(*           -> CorrectDecoder *)
+(*               monoid *)
+(*               Source_Predicate *)
+(*               Source_Predicate *)
+(*               eq *)
+(*               empty_Format *)
+(*               (filter_decode op) *)
+(*               decode_inv *)
+(*               empty_Format. *)
+(*       Proof. *)
+(*         intros. *)
+(*         destruct op. *)
+(*         - eapply ExtractViewFrom; eauto; unfold empty_Format; eauto. *)
+(*         - unfold CorrectDecoder, empty_Format; split. intros. *)
+(*           + elimtype False; eapply H0. eauto. *)
+(*           + discriminate. *)
+(*       Qed. *)
 
-    rewrite ito_list_cons in H. 
-    destruct H; cycle 1.
-    + eapply in_map_iff in H.
-      destruct H as (y &Heqxy & H).
-      eapply IHtypes in H.
-      etransitivity; [rewrite <- Heqxy| reflexivity].
-      assert (LHS_lemma:
-               forall n (types : Vector.t Type n) (h: Type) (y : SumType types) S (s:S) ,
-                 let types':= (Vector.cons Type h n types) in
-                 forall (projs : ilist (B:=fun T : Type => S -> T) types'),
-                   ith projs (SumType_index types' (lift_SumType h y)) s ~=
-                     ith projs (Fin.FS (SumType_index types y)) s).
-      {
-        clear; intros.
-        subst types'.
-        erewrite SumType_index_lift.
-        econstructor.
-      }
-      eapply JMeq_eq.
-      etransitivity.
-      eapply LHS_lemma.
-      simpl.
-      rewrite H.
 
-      eapply SumType_proj_lift.
+(*       Definition first_check_list {m S} {types : Vector.t Type m} (v : list (SumType types)) *)
+(*         ( decode2 : ilist types -> DecodeM (S * ByteString) ByteString): *)
+(*         DecodeM (S * ByteString) ByteString:= *)
+(*         sequence_Decode (decode_filter v) decode2. *)
+(*       Lemma Blah: *)
+(*         forall (S : Type) (m : nat) (types : Vector.t Type m)  *)
+(*           (projs : ilist(B:=(fun T : Type => S -> T)) types) *)
+(*           (cache_inv : CacheDecode -> Prop) *)
+(*           (view_fin : Fin.t m -> Prop) (source_pred : S -> Prop) *)
+(*           (invariants : ilist (B:=(fun T : Type => T -> Prop)) types) *)
+(*           (decode2 : ilist(B:=id) types -> DecodeM (S * ByteString) ByteString) *)
+(*           (P_inv2 : (CacheDecode -> Prop) -> Prop) (v1 : list (SumType types)) *)
+(*           format2, *)
+(*           cache_inv_Property cache_inv P_inv2 -> *)
+(*           forall (Decode2_correct: forall v2 : ilist types, *)
+(*                 cache_inv_Property cache_inv P_inv2 -> *)
+(*                 (exists s0 : ilist types, v2 = s0 /\ sortType v1 = Some s0) -> *)
+(*                 CorrectDecoder ByteStringQueueMonoid *)
+(*                   (fun s : S => *)
+(*                      (source_pred s /\ Permutation (to_list projs s) v1) /\ Some v2 = sortType v1) *)
+(*                   (fun s : S => *)
+(*                      (source_pred s /\ Permutation (to_list projs s) v1) /\ Some v2 = sortType v1) *)
+(*                   eq format2 (decode2 v2) cache_inv format2) , *)
+(*             cache_inv_Property cache_inv P_inv2 -> *)
+(*             (fun ls : list (SumType types) => *)
+(*                (| ls |) = m /\ *)
+(*                  (forall x : SumType types, *)
+(*                      In x ls -> *)
+(*                      (fun st : SumType types => *)
+(*                         view_fin (SumType_index types st) /\ *)
+(*                           ith invariants (SumType_index types st) (SumType_proj types st)) x)) v1 -> *)
+(*             CorrectDecoder ByteStringQueueMonoid *)
+(*               (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) *)
+(*               (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) eq *)
+(*               (Compose_Format empty_Format *)
+(*                  (constant (fun v2 : ilist types => Some v2 = sortType v1)) ++  *)
+(*                  format2) *)
+(*               (* (Ifopt sortType v1 as ils Then decode2 ils Else constant (constant None)) *) *)
+(*               (first_check_list v1 decode2) *)
+(*               cache_inv (Compose_Format empty_Format *)
+(*                            (constant (fun v2 : ilist types => Some v2 = sortType v1)) ++ *)
+(*                            format2). *)
+(*       Proof. *)
+(*         intros. *)
+(*         unfold first_check_list. *)
+(*         eapply sequence_Compose_format_decode_correct; cycle 1. *)
+(*         - simpl; intros. *)
+(*           instantiate (1:= fun s => exists s0, s = s0 /\ sortType v1 = Some s0). *)
+(*           unshelve eapply CorrectDecoderEmptyOpt. *)
+(*           + destruct (sortType v1). *)
+(*             * simpl. intros ? [ ? []]. subst; inversion H4; reflexivity. *)
+(*             * constructor. *)
+(*           + destruct (sortType v1). *)
+(*             * simpl. eexists; split; reflexivity. *)
+(*             * simpl. intros ? [? []]. inversion H4. *)
+(*         - simpl; intros. exists v; split; eauto. *)
+(*         - simpl. eassumption. (* Hypothesis of the next format. *) *)
+(*         - unfold cache_inv_Property in *; split; eauto. *)
+(*       Qed. *)
 
-    + clear IHtypes.
-      rewrite <- H.
-      destruct types; reflexivity.
+(*       intros. *)
+(*       eapply format_decode_correct_refineEquiv_Proper. *)
+(*       { instantiate (1 := (Compose_Format empty_Format *)
+(*                              (constant (fun v2 : ilist types => Some v2 = sortType v1)) ++ *)
+(*                              format2)). *)
+(*         unfold flip; simpl. *)
+(*         unfold EquivFormat, refineEquiv; intros; simpl. *)
+(*   Admitted. *)
   
 
+(*   Lemma Permutation_decoder'':  *)
+(*     forall (S: Type) m (types: Vector.t Type m) *)
+(*            (projs: ilist (B:= fun T => S -> T) types) (cache_inv: CacheDecode -> Prop) *)
+(*            (cache_invariants: Vector.t ((_ -> Prop) -> Prop) m) fin_cache_inv *)
+(*            (fin_format : FormatM (Fin.t m) ByteString) *)
+(*            fin_decoder view_fin *)
+(*            (fin_correct: cache_inv_Property cache_inv fin_cache_inv -> *)
+(*                          CorrectDecoder ByteStringQueueMonoid view_fin  *)
+(*                            view_fin eq fin_format fin_decoder cache_inv fin_format) *)
+(*            (formats : ilist types) *)
+(*            (source_pred : S -> Prop), *)
+(*       cache_inv_Property cache_inv *)
+(*         (fun P : CacheDecode -> Prop => *)
+(*            fin_cache_inv P /\ *)
+(*              IterateBoundedIndex.Iterate_Ensemble_BoundedIndex *)
+(*                (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) -> *)
+(*       forall (invariants: ilist (B:= fun T : Type => T -> Prop) types) *)
+(*              (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types) *)
+(*              (formatrs_decoders_correct : *)
+(*                IterateBoundedIndex.Iterate_Ensemble_BoundedIndex *)
+(*                  (fun idx => *)
+(*                     cache_inv_Property cache_inv (Vector.nth cache_invariants idx) *)
+(*                     -> CorrectDecoder *)
+(*                          ByteStringQueueMonoid *)
+(*                          (ith invariants idx) *)
+(*                          (ith invariants idx) *)
+(*                          eq *)
+(*                          (ith formats idx) *)
+(*                          (ith decoders idx) *)
+(*                          cache_inv *)
+(*                          (ith formats idx))) *)
+(*              (Hinvariants_ok: forall (s : S) (v : list (SumType types)), *)
+(*                  source_pred s -> *)
+(*                  Permutation (to_list projs s) v -> *)
+(*                  forall x : SumType types, *)
+(*                    In x (to_list projs s) -> *)
+(*                    view_fin (SumType_index types x) /\ *)
+(*                      ith invariants (SumType_index types x) (SumType_proj types x)) *)
+(*              format2 (decode2: list (SumType types) -> DecodeM (S * ByteString) ByteString) *)
+(*              (P_inv2:(CacheDecode -> Prop) -> Prop) *)
+(*              (Restablish:  ilist(B:=id) types -> S) *)
+(*              (Hcache_inv2: cache_inv_Property cache_inv *)
+(*                              (fun P : CacheDecode -> Prop => *)
+(*                                 (fin_cache_inv P /\ *)
+(*                                    IterateBoundedIndex.Iterate_Ensemble_BoundedIndex' *)
+(*                                      (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) /\ *)
+(*                                   P_inv2 P)) *)
+(*              (Decoder2_Correct: forall v1 : list (SumType types), *)
+(*                  cache_inv_Property cache_inv P_inv2 -> *)
+(*                  (| v1 |) = m /\ *)
+(*                    (forall x : SumType types, *)
+(*                        In x v1 -> *)
+(*                        view_fin (SumType_index types x) /\ *)
+(*                          ith invariants (SumType_index types x) (SumType_proj types x)) -> *)
+(*                  CorrectDecoder ByteStringQueueMonoid *)
+(*                    (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) *)
+(*                    (fun s : S => source_pred s /\ Permutation (to_list projs s) v1) eq format2 *)
+(*                    (decode2 v1) cache_inv format2) *)
+(*       , *)
+(*         CorrectDecoder ByteStringQueueMonoid *)
+(*           source_pred source_pred *)
+(*           eq  *)
+(*           (@permutation_Format *)
+(*              S m types projs fin_format formats *)
+(*           ) *)
+(*           (permutation_decoder fin_decoder decoders decode2) *)
+(*           cache_inv *)
+(*           (@permutation_Format *)
+(*              S m types projs fin_format formats *)
+(*           ). *)
+(*   Proof. *)
+(*     intros. *)
+(*     (* add empty*) *)
+(*     eapply format_decode_correct_refineEquiv_Proper. *)
+(*     unfold flip; simpl. *)
+(*     Lemma EquivFormat_sym {S T cach}: *)
+(*       Symmetric (@EquivFormat S T cach). *)
+(*     Admitted. *)
+(*     eapply EquivFormat_sym, sequence_mempty'. *)
 
-Section Filter.
+    
+(*     (* Real goal*) *)
+(*     unfold permutation_Format, permutation_list_Format, SumType_list_Format. *)
+(*     normalize_format. (*10.1, 10, 10*) *)
+(*     eapply sequence_Compose_format_decode_correct; cycle 1. *)
+(*     intros. *)
+(*     (* eapply strengthen_view_pred_Proper; unfold flip, pointwise_relation, impl; cycle 1. *) *)
+(*     (* eapply weaken_view_predicate_Proper; unfold flip, pointwise_relation, impl. cycle 1. *) *)
+(*     (* eapply weaken_source_pred_Proper; unfold flip, pointwise_relation, impl; simpl; cycle 1. *) *)
+(*     (* weaken_view_predicate_Proper *)
+(*       strengthen_view_pred_Proper *) *)
+    
+(*     (*1*) intros; apply FixList_decode_correct. *)
+(*     eapply IndexedSumType_Decoder_Correct; eassumption; eassumption; eassumption. *)
+(*     - simpl. intros s v Hsource Hperm. *)
+(*       split. *)
+(*       + eapply Permutation_length in Hperm. *)
+(*         rewrite <- Hperm.  *)
+(*         eapply to_list_length.  *)
+(*       + intros ??; *)
+(*           eapply Hinvariants_ok; eauto.  *)
+(*         eapply Permutation_in; [symmetry|];  eassumption. *)
+(*     - simpl. intros. *)
+(*       make_fake (decode2 v1). *)
+(*       unshelve eapply CorrectDecoderEmptyOpt. *)
+(*       + { eapply BindOpt. *)
+(*           - eapply sortType. *)
+(*             exact v1. *)
+(*           - exact (fun ils => Some (Restablish ils)). } *)
+(*       + destruct (BindOpt (sortType v1) (fun ils => Some (Restablish ils))) eqn:Heq; try solve[constructor]. *)
+(*         simpl. intros ? [? ?]. *)
+(*         Lemma ito_list_sortType_roundTrip: *)
+(*           forall (m : nat) *)
+(*             (types : Vector.t Type m), *)
+(*           forall x (v1: list (SumType types)), *)
+(*             Permutation (ito_list x) v1 <-> *)
+(*               sortType v1 = Some x. *)
+(*         Admitted. *)
+(*         eapply ito_list_sortType_roundTrip in H4. *)
+(*         destruct (sortType v1); simpl in *; try solve [inversion Heq]. *)
+(*         inversion H4; subst i. *)
+(*         assert (Restablish_Correct1: forall s, Restablish (iapp projs s) = s) by admit. *)
+(*         rewrite Restablish_Correct1 in Heq. inversion Heq; reflexivity. *)
+(*       + destruct (sortType v1) eqn:Heq. *)
+(*         * simpl. *)
+(*           unfold to_list. *)
+(*           assert (Restablish_Correct2: forall s, (iapp projs (Restablish s)) = s) by admit. *)
+(*           rewrite Restablish_Correct2. *)
+(*           split. *)
+(*           2: eapply ito_list_sortType_roundTrip; assumption. *)
+(*           admit. *)
+(*         * simpl. intros ? []. *)
+(*           eapply ito_list_sortType_roundTrip in H4. *)
+(*           rewrite H4 in Heq; inversion Heq. *)
+(*       + admit. *)
+(*     - simpl. simpl. *)
+(*       assumption. *)
+(*   Qed. *)
 
-  
-Definition filter_format {S T cache} (format: @FormatM S T cache) (condition: S -> Prop) : @FormatM S T cache:=
-fun (X : S) (X0 : CacheFormat) (X1 : T * CacheFormat) => format X X0 X1 /\ condition X.  
+(*   (* Some lemmas to modifiy themake the statment amenable to automation*) *)
 
-Lemma CorrectDecoder: 
+(*   Lemma SumType_index_lift: *)
+(*     forall n (types : Vector.t Type n) (h: Type) (y : SumType types), *)
+(*       (SumType_index (Vector.cons Type h n types) (lift_SumType h y)) = *)
+(*         Fin.FS (SumType_index types y). *)
+(*   Proof. *)
+(*     destruct types. *)
+(*     - intros; elim y. *)
+(*     - reflexivity. *)
+(*   Qed. *)
+
+(*   Lemma SumType_proj_lift: *)
+(*     forall n (types : Vector.t Type n) (h: Type) (y : SumType types), *)
+(*       let types':= (Vector.cons Type h n types) in *)
+(*       SumType_proj types y ~= SumType_proj types' (lift_SumType h y) *)
+(*   . *)
+(*   Proof. *)
+(*     destruct types. *)
+(*     - intros. elim y. *)
+(*     - reflexivity. *)
+(*   Qed. *)
+
+(*   Lemma SumType_proj_in_list: *)
+(*     forall { S : Type} {m : nat} (types : Vector.t Type m) (projs : ilist(B:= (fun T : Type => S -> T)) types) s x,  *)
+(*       In x (to_list projs s) -> *)
+(*       ith projs (SumType_index types x) s = SumType_proj types x. *)
+(*   Proof. *)
+(*     induction types. *)
+(*     - intros. elim H. *)
+(*     - intros. destruct projs as [pi0 projs]. *)
+(*       unfold to_list, iapp in H. *)
+(*       simpl imap in H. *)
+(*       Lemma ito_list_cons: *)
+(*         forall {n} {T:Type} {types : Vector.t Type n} (x0: T) (ils: ilist(B:=id) types),   *)
+(*           let typs := Vector.cons Type T n types in *)
+(*           ito_list (icons x0 ils) = *)
+(*             inj_SumType typs Fin.F1 x0 :: map (lift_SumType T) (@ito_list n types ils). *)
+(*       Proof. reflexivity. Qed. *)
+
+(*       rewrite ito_list_cons in H.  *)
+(*       destruct H; cycle 1. *)
+(*       + eapply in_map_iff in H. *)
+(*         destruct H as (y &Heqxy & H). *)
+(*         eapply IHtypes in H. *)
+(*         etransitivity; [rewrite <- Heqxy| reflexivity]. *)
+(*         assert (LHS_lemma: *)
+(*                  forall n (types : Vector.t Type n) (h: Type) (y : SumType types) S (s:S) , *)
+(*                    let types':= (Vector.cons Type h n types) in *)
+(*                    forall (projs : ilist (B:=fun T : Type => S -> T) types'), *)
+(*                      ith projs (SumType_index types' (lift_SumType h y)) s ~= *)
+(*                        ith projs (Fin.FS (SumType_index types y)) s). *)
+(*         { *)
+(*           clear; intros. *)
+(*           subst types'. *)
+(*           erewrite SumType_index_lift. *)
+(*           econstructor. *)
+(*         } *)
+(*         eapply JMeq_eq. *)
+(*         etransitivity. *)
+(*         eapply LHS_lemma. *)
+(*         simpl. *)
+(*         rewrite H. *)
+
+(*         eapply SumType_proj_lift. *)
+
+(*       + clear IHtypes. *)
+(*         rewrite <- H. *)
+(*         destruct types; reflexivity. *)
+        
+
+
+(*         Section Filter. *)
+
+          
+(*           Definition filter_format {S T cache} (format: @FormatM S T cache) (condition: S -> Prop) : @FormatM S T cache:= *)
+(*             fun (X : S) (X0 : CacheFormat) (X1 : T * CacheFormat) => format X X0 X1 /\ condition X.   *)
+
+(*           Lemma CorrectDecoder:  *)
 
 
 
-Global Arguments permutation_Format {S m types} projections fin_format formats. 
-Global Opaque permutation_Format.
+(*             Global Arguments permutation_Format {S m types} projections fin_format formats.  *)
+(*             Global Opaque permutation_Format. *)
 
 
-Create HintDb resilience.
-Global Hint Resolve word_resilience: resilience.
-Global Hint Resolve format_enum_resilience: resilience.
+(*             Create HintDb resilience. *)
+(*             Global Hint Resolve word_resilience: resilience. *)
+(*             Global Hint Resolve format_enum_resilience: resilience. *)

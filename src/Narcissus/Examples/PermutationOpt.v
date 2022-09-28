@@ -237,9 +237,15 @@ Module Permutation.
 
      
       -- match goal with
-           |- decidesOpt ?x _ => destruct x eqn:HHx; simpl
+           |- decidesOptBool ?x _ _ => destruct x eqn:HHx; simpl
          end.
-
+         ++ eapply decides_and.
+            ** eapply decides_True'.
+            ** instantiate(1:= true).
+            admit.
+         ++ intros ? [_ ?].
+         
+         
          
         Lemma decidesOpt_and:
            forall {B B'}
@@ -538,7 +544,7 @@ Module PermutationCodes2.
         Qed.
 
         Ltac normalize_step BitStringT ::=
-          (first
+          (first_debug
              [ match goal with
                | |- EquivFormat ?z ?x => is_evar z; apply EquivFormat_reflexive
                end; idtac "1"
