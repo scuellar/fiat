@@ -1776,17 +1776,17 @@ End PermutationToList.
 (*         Section Filter. *)
 
           
-(*           Definition filter_format {S T cache} (format: @FormatM S T cache) (condition: S -> Prop) : @FormatM S T cache:= *)
-(*             fun (X : S) (X0 : CacheFormat) (X1 : T * CacheFormat) => format X X0 X1 /\ condition X.   *)
+          (* Definition filter_format {S T cache} (format: @FormatM S T cache) (condition: S -> Prop) : @FormatM S T cache:= *)
+          (*   fun (X : S) (X0 : CacheFormat) (X1 : T * CacheFormat) => format X X0 X1 /\ condition X. *)
 
-(*           Lemma CorrectDecoder:  *)
-
-
-
-(*             Global Arguments permutation_Format {S m types} projections fin_format formats.  *)
-(*             Global Opaque permutation_Format. *)
+          (* Lemma CorrectDecoder: *)
 
 
-(*             Create HintDb resilience. *)
-(*             Global Hint Resolve word_resilience: resilience. *)
-(*             Global Hint Resolve format_enum_resilience: resilience. *)
+
+            Global Arguments permutation_Format {S m types} projections fin_format formats.
+            Global Opaque permutation_Format.
+
+
+            Create HintDb resilience.
+            Global Hint Resolve word_resilience: resilience.
+            Global Hint Resolve format_enum_resilience: resilience.
