@@ -31,6 +31,83 @@ Notation "{{ x ; .. ; y }}" := (Build_prim_prod x .. (Build_prim_prod y tt) .. )
 Definition ituple {n} tys: Type:= @ilist _ id n tys.
 
 
+
+(*----------  Start empty lemms to move *)
+
+             Lemma decides_ilist_projections':
+               forall {a n l} ils x y b_x b_y ,
+                 decides b_x (x = prim_fst ils) -> 
+                 decides b_y (y = prim_snd ils) ->
+                 decides (b_x && b_y)
+                   (@icons Type id a n l x y = ils).
+             Proof.
+               simpl.
+               intros.
+               eapply decides_mor_Proper; [reflexivity| | ]; cycle 1.
+               eapply decides_and; eauto.
+               destruct ils; simpl in *.
+               split; intros H1.
+               - inversion H1; auto.
+               - destruct H1; subst; eauto.
+             Qed.
+             Lemma decides_ilist_projections0:
+               forall {a} ils x y b_x b_y ,
+                 decides b_x (x = prim_fst ils) -> 
+                 decides b_y (y = prim_snd ils) ->
+                 decides (b_x && b_y)
+                   (@icons Type id a 0 (Vector.nil _) x y = ils).
+             Proof.
+               intros.
+               eapply decides_ilist_projections'; eauto.
+             Qed.
+             
+             Lemma decides_ilist_projections:
+               forall {a n l} (ils: ilist(B:=id) (Vector.cons Type a n l)) x y b_x b_y ,
+                 decides b_x (x = prim_fst ils) -> 
+                 decides b_y (y = prim_snd ils) ->
+                 decides (b_x && b_y)
+                   (icons x y = ils).
+             Proof.
+               simpl; intros. eapply decides_ilist_projections'; eauto.
+             Qed.
+
+             
+             Ltac decide_ilist_projection:= match goal with
+                         | |- decides _ (_ = ?v) =>
+                             eapply (decides_ilist_projections v)
+                         | |- decides _ (_ = ?v) =>
+                             eapply (decides_ilist_projections0 v)
+                         | |- decides _ (_ = ?v) =>
+                             eapply (decides_ilist_projections' v)
+                                            end.
+             
+
+             (* Add this to the automation of Indexedsumtype*)
+             Ltac split_prim_and :=
+               repeat match goal with
+                   |- IterateBoundedIndex.prim_and ?x ?y =>
+                     apply IterateBoundedIndex.Build_prim_and
+                 end; try exact I; simpl; intros.
+             
+(*----------  end empty lemms to move *)
+
+
+             (*the application tactic*)
+             
+        Ltac apply_Permutation_decoder_Correct types:=
+          let types' := eval unfold types in types in
+            ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
+              ltac:(fun decoders' =>
+                      ilist_of_evar (fun T : Type => T -> Prop) types'
+                        ltac:(fun invariants' =>
+                                Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
+                                  ltac:(fun cache_invariants' =>
+                                          eapply Permutation_decoder_Correct with
+                                          (cache_invariants := cache_invariants')
+                                          (invariants:= invariants')
+                                          (decoders:= decoders')
+                   ))).
+
 (** * Simple permutation (two formats)*)
 (* | In this module we present the simplest example of using IndexedSumType.
    It encodes either an 8bit woord or an 16bit word.
@@ -69,6 +146,8 @@ Module Permutation.
     [| unfold Vector.nth; repeat constructor | |IndexedSumType.split_iterate ]; simpl;
     eauto with resilience.
   Definition inv (msg: message):= True.
+
+
   
   Let enc_dec : EncoderDecoderPair (permutation_Format myProjections myFinFormat myFormats) inv.
   Proof.
@@ -80,62 +159,61 @@ Module Permutation.
       start_synthesizing_decoder.
       + normalize_format.
         (* Set Printing Implicit. *)
-
-        Ltac apply_Permutation_decoder_Correct types:=
-          let types' := eval unfold types in types in
-            ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
-              ltac:(fun decoders' =>
-                      ilist_of_evar (fun T : Type => T -> Prop) types'
-                        ltac:(fun invariants' =>
-                                Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
-                                  ltac:(fun cache_invariants' =>
-                                          eapply Permutation_decoder_Correct with
-                                          (cache_invariants := cache_invariants')
-                                          (invariants:= invariants')
-                                          (decoders:= decoders')
-                   ))).
         apply_Permutation_decoder_Correct types;
-                                           try solve[apply_rules]; cycle 1.
-        *
-          (* Add this to the automation of Indexedsumtype*)
-          Ltac split_prim_and :=
-             repeat match goal with
-               |- IterateBoundedIndex.prim_and ?x ?y =>
-                 apply IterateBoundedIndex.Build_prim_and
-             end; try exact I; simpl; intros.
-          simpl; split_prim_and.
-          all: apply_rules.
-        * intros; simpl; split_prim_and;
-            (* This will need to change. Perhaps the correctness lemma
-            needs a stronger hypothesis? *)
-            auto.
-        * intros.
-          (* ExtractSource *)
-         simpl; intros; eapply CorrectDecoderEmpty.
-          -- (* build_fully_determined_type *)
-            unfold Heading.Domain, Tuple.GetAttribute, Tuple.GetAttributeRaw,
-              Basics.compose in *; simpl in *;
-              let a' := fresh in
-              intros a'; try destruct a'; destruct_conjs;
-              unfold Heading.Domain, Tuple.GetAttribute, Tuple.GetAttributeRaw in *;
-              simpl in *; intros; decompose_source_predicate; subst_projections.
-            Transparent iapp.
-            unfold iapp; simpl in *.
-            repeat subst_invertible_functions_two; reflexivity.
-          -- simpl.
-             eapply decides_and.
-             apply decides_True'.
-             
-             
-             Instance icons_invert {A B} {a:A} {n:nat} l  :
-               ConditionallyInvertibleTwo (@icons _ B a n l) (fun _ _ => True) (ilist_hd') (ilist_tl').
+          (* several intermediate steps have to be solved with `apply
+          rules` before proceeding. This application is sensitive and
+          can't be reordered. *)
+        [ clear H; intro H; apply_rules
+        | eapply H
+        | simpl; split_prim_and; apply_rules
+        | intros; simpl; split_prim_and; eauto
+        | unfold iapp
+        ].
+        (* ExtractSource *)
+        simpl; intros; eapply CorrectDecoderEmpty.
+        -- (* build_fully_determined_type. *)
+          
+          Instance icons_invert {A B} {a:A} {n:nat} l  :
+            ConditionallyInvertibleTwo (@icons _ B a n l) (fun _ _ => True) (ilist_hd') (ilist_tl').
+          Proof. constructor; reflexivity. Qed.
+          
+          build_fully_determined_type.
+        -- eapply decides_and; [apply decides_True' | ].
+           
+           Lemma decides_ilist_projections1:
+               forall {X Y} (ils: prim_prod X Y) (x:X) (y:Y) b_x b_y ,
+                 decides b_x (x = prim_fst ils) -> 
+                 decides b_y (y = prim_snd ils) ->
+                 decides (b_x && b_y)
+                   (Build_prim_prod x y = ils).
              Proof.
-               constructor; reflexivity.
+               simpl.
+               intros.
+               eapply decides_mor_Proper; [reflexivity| | ]; cycle 1.
+               eapply decides_and; eauto.
+               destruct ils; simpl in *.
+               split; intros H1.
+               - inversion H1; auto.
+               - destruct H1; subst; eauto.
              Qed.
-             
-             unfold IsProj.
-             repeat first[blah | apply decides_eq_refl].
 
+             repeat first[  eapply decides_ilist_projections1 | apply decides_eq_refl].
+
+
+             
+             Ltac match_inside_prim_snd x k:=
+               match x with
+               | prim_snd ?x' => match_inside_prim_snd x' k
+               | ?x' => k x
+               end.
+             Ltac destruct_ilist x:=
+               match type of x with
+               | () => destruct x
+               | (ilist []) => destruct x
+               | _ => let y:= fresh "x" in
+                     destruct x as [? y];
+                     destruct_ilist y 
+               end.
              
              match goal with
                |- decides _ (inil = ?x) =>
@@ -143,17 +221,13 @@ Module Permutation.
                    ltac:(destruct_ilist)
              end; simpl.
              apply decides_eq_refl.
-             
-             
-        * Transparent cache_inv_Property.
-          unfold cache_inv_Property in *; simpl in *; repeat split;
-            unfold Vector.nth; simpl in *; auto.
-          instantiate(2:= constant True); constructor.
-          
+           
       + cbv beta; synthesize_cache_invariant.
       + cbv beta; unfold decode_nat, sequence_Decode;
           optimize_decoder_impl.
-      + cbv beta; align_decoders.
+      + simpl.
+        unfold permutation_ilist_decoder, decode_filter, sequence_Decode.
+        cbv beta. align_decoders.
         ltac:(cbv beta; unfold decode_nat, sequence_Decode;
               optimize_decoder_impl) ltac:(cbv beta; align_decoders)
 

@@ -796,13 +796,8 @@ Section ListPermutations.
            (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
                          CorrectDecoder ByteStringQueueMonoid view_fin 
                            view_fin eq fin_format fin_decoder cache_inv fin_format)
-           (formats : ilist types),
-      cache_inv_Property cache_inv
-        (fun P : CacheDecode -> Prop =>
-           fin_cache_inv P /\
-             IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-               (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
-      forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
+           (formats : ilist types)
+           (invariants: ilist (B:= fun T : Type => T -> Prop) types)
              (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
              (formatrs_decoders_correct : IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
                                             (fun idx =>
@@ -842,10 +837,8 @@ Section ListPermutations.
     normalize_format. (*10.1, 10, 10*)
 
     eapply sequence_Compose_format_decode_correct; cycle 1.
-    intros.
-    
     - (*1*) intros; apply FixList_decode_correct.
-      eapply IndexedSumType_Decoder_Correct; eassumption; eassumption; eassumption.
+      eapply IndexedSumType_Decoder_Correct; eassumption.
     - simpl. intros s v Hsource Hperm.
       split.
       + eapply Permutation_length in Hperm.
@@ -955,13 +948,8 @@ Section ListPermutations.
            (fin_correct: cache_inv_Property cache_inv fin_cache_inv ->
                          CorrectDecoder ByteStringQueueMonoid view_fin 
                            view_fin eq fin_format fin_decoder cache_inv fin_format)
-           (formats : ilist types),
-      cache_inv_Property cache_inv
-        (fun P : CacheDecode -> Prop =>
-           fin_cache_inv P /\
-             IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
-               (fun idx : Fin.t m => Vector.nth cache_invariants idx P)) ->
-      forall (invariants: ilist (B:= fun T : Type => T -> Prop) types)
+           (formats : ilist types)
+           (invariants: ilist (B:= fun T : Type => T -> Prop) types)
              (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
              (formatrs_decoders_correct : IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
                                             (fun idx =>
@@ -1139,8 +1127,10 @@ Section ObjectPermutation.
                          (ith decoders idx)
                          cache_inv
                          (ith formats idx)))
-             (Hinvariants_ok:
-               forall (ils : ilist types) (v : list (SumType types)),
+             
+             (* Perhaps this is too strong? I don't know if it should
+                be prefixed with the source predicate or something. *)
+             (Hinvariants_ok: forall (ils : ilist types) (v : list (SumType types)),
                  Permutation (ito_list ils) v ->
                  IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
                    (fun idx : Fin.t m => view_fin idx /\ ith invariants idx (ith ils idx))
@@ -1168,7 +1158,6 @@ Section ObjectPermutation.
   Proof.
     intros.
     unfold permutation_Format, permutation_decoder.
-
     (* add an empty format at the end without joining the projections. *)
     Opaque permutation_ilist_Format.
     normalize_format.
@@ -1178,19 +1167,17 @@ Section ObjectPermutation.
     - intros.
       eapply @Permutation_ilist_decoder_correct; eauto.
 
-      (* cache_invariants *)
-      unfold cache_inv_Property in *; simpl.
-      split_and.
-      repeat split; eauto.
+      
     - simpl; tauto.
-    - unfold cache_inv_Property in *; simpl.
+    - simpl. unfold cache_inv_Property in *; simpl.
       split_and.
-      repeat split; auto.
+      repeat split; auto;
 
       (* This could be solve by some of the hypothesis we already have
       (e.g. `H0 : fin_cache_inv cache_inv`). But conceptually it
       should be trivial. *)
-      (instantiate (1 := constant True)); constructor.
+      [ | ]; (instantiate (1 := constant True)); constructor.
+      
   Qed.
 
   (* Version of the lemma with words as indices *)
