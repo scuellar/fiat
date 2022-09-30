@@ -80,142 +80,62 @@ Module Permutation.
       start_synthesizing_decoder.
       + normalize_format.
         (* Set Printing Implicit. *)
-        let types' := eval unfold types in types in
-          ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
-            ltac:(fun decoders' =>
-                    ilist_of_evar (fun T : Type => T -> Prop) types'
-                      ltac:(fun invariants' =>
-                              Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
-                                ltac:(fun cache_invariants' =>
-                                        eapply Permutation_decoder_Correct with
-                                        (cache_invariants := cache_invariants')
-                                        (invariants:= invariants')
-                                        (decoders:= decoders')
-                 )));
+
+        Ltac apply_Permutation_decoder_Correct types:=
+          let types' := eval unfold types in types in
+            ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
+              ltac:(fun decoders' =>
+                      ilist_of_evar (fun T : Type => T -> Prop) types'
+                        ltac:(fun invariants' =>
+                                Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
+                                  ltac:(fun cache_invariants' =>
+                                          eapply Permutation_decoder_Correct with
+                                          (cache_invariants := cache_invariants')
+                                          (invariants:= invariants')
+                                          (decoders:= decoders')
+                   ))).
+        apply_Permutation_decoder_Correct types;
                                            try solve[apply_rules]; cycle 1.
-        * split. 2: split. 
-          all: simpl; intros.
-          apply_rules.
-          apply_rules.
-          constructor.
-        * intros ???.
-          repeat (split; auto).
+        *
+          (* Add this to the automation of Indexedsumtype*)
+          Ltac split_prim_and :=
+             repeat match goal with
+               |- IterateBoundedIndex.prim_and ?x ?y =>
+                 apply IterateBoundedIndex.Build_prim_and
+             end; try exact I; simpl; intros.
+          simpl; split_prim_and.
+          all: apply_rules.
+        * intros; simpl; split_prim_and;
+            (* This will need to change. Perhaps the correctness lemma
+            needs a stronger hypothesis? *)
+            auto.
         * intros.
           (* ExtractSource *)
-          eapply CorrectDecoderEmpty.
+         simpl; intros; eapply CorrectDecoderEmpty.
           -- (* build_fully_determined_type *)
             unfold Heading.Domain, Tuple.GetAttribute, Tuple.GetAttributeRaw,
-              Basics.compose in *; simpl in *.
-            
-            let a' := fresh in
-            intros a'; try destruct a'; destruct_conjs.
-
-            unfold Heading.Domain, Tuple.GetAttribute, Tuple.GetAttributeRaw in *;
-              simpl in *; intros; decompose_source_predicate. subst_projections.
-            simpl in *.
-
-            Class ConditionallyInvertibleTwo {A0 A1 B : Type} (F: A0 -> A1 -> B)(P : A0 -> A1 -> Prop)
-              (F0: B -> A0)(F1: B -> A1) :=
-              { CInvTwoRoundTrip0 : forall a0 a1, P a0 a1 -> F0 (F a0 a1) = a0;
-                CInvTwoRoundTrip1 : forall a0 a1, P a0 a1 -> F1 (F a0 a1) = a1}.
-            
-            (* This lemma restates the invertible condition as a manipulation of
-           equations.   *)
-            Lemma CInvTwo_equation :
-              forall A0 A1 B F P F0 F1 {CInv: @ConditionallyInvertibleTwo A0 A1 B F P F0 F1},
-              forall a0 a1 b, P a0 a1 -> F a0 a1 = b -> a0 = F0 b /\ a1 = F1 b.
-            Proof. intros * ? *  ? HH. rewrite <- HH.
-                   rewrite CInvTwoRoundTrip0; auto.
-                   rewrite CInvTwoRoundTrip1; auto. Qed.
-            
-            Ltac subst_invertible_functions_two :=
-              match goal with
-              | H:?f ?x ?y = _
-                |- _ =>
-                  eapply (CInvTwo_equation _ _ _ f) in H;
-                  idtac H;
-                  [ destruct H | now typeclasses eauto | now simpl in *; eauto ]; 
-                  try subst x
-              end.
-
-            Instance icons_invert {A B} {a:A} {n:nat} l  :
-              ConditionallyInvertibleTwo (@icons _ B a n l) (fun _ _ => True) (ilist_hd') (ilist_tl').
-            Proof.
-              constructor; reflexivity.
-            Qed.
-            
-            repeat subst_invertible_functions_two.
-            reflexivity.
+              Basics.compose in *; simpl in *;
+              let a' := fresh in
+              intros a'; try destruct a'; destruct_conjs;
+              unfold Heading.Domain, Tuple.GetAttribute, Tuple.GetAttributeRaw in *;
+              simpl in *; intros; decompose_source_predicate; subst_projections.
+            Transparent iapp.
+            unfold iapp; simpl in *.
+            repeat subst_invertible_functions_two; reflexivity.
           -- simpl.
-             unfold inv.
              eapply decides_and.
              apply decides_True'.
-             simpl.
-             unfold IsProj, iapp; simpl.
-             Print HintDb decide_data_invariant_db.
              
-             Lemma decides_ilist_projections':
-               forall {a n l} ils x y b_x b_y ,
-                 decides b_x (x = prim_fst ils) -> 
-                 decides b_y (y = prim_snd ils) ->
-                 decides (b_x && b_y)
-                   (@icons Type id a n l x y = ils).
+             
+             Instance icons_invert {A B} {a:A} {n:nat} l  :
+               ConditionallyInvertibleTwo (@icons _ B a n l) (fun _ _ => True) (ilist_hd') (ilist_tl').
              Proof.
-               simpl.
-               intros.
-               eapply decides_mor_Proper; [reflexivity| | ]; cycle 1.
-               eapply decides_and; eauto.
-               destruct ils; simpl in *.
-               split; intros H1.
-               - inversion H1; auto.
-               - destruct H1; subst; eauto.
-             Qed.
-             Lemma decides_ilist_projections0:
-               forall {a} ils x y b_x b_y ,
-                 decides b_x (x = prim_fst ils) -> 
-                 decides b_y (y = prim_snd ils) ->
-                 decides (b_x && b_y)
-                   (@icons Type id a 0 (Vector.nil _) x y = ils).
-             Proof.
-               intros.
-               eapply decides_ilist_projections'; eauto.
+               constructor; reflexivity.
              Qed.
              
-             Lemma decides_ilist_projections:
-               forall {a n l} (ils: ilist(B:=id) (Vector.cons Type a n l)) x y b_x b_y ,
-                 decides b_x (x = prim_fst ils) -> 
-                 decides b_y (y = prim_snd ils) ->
-                 decides (b_x && b_y)
-                   (icons x y = ils).
-             Proof.
-               simpl; intros. eapply decides_ilist_projections'; eauto.
-             Qed.
-
-             Global Hint Resolve decides_ilist_projections : HintDb decide_data_invariant_db.
-             eauto with HintDb decide_data_invariant_db.
-             
-             Ltac blah:= match goal with
-                         | |- decides _ (_ = ?v) =>
-                             eapply (decides_ilist_projections v)
-                         | |- decides _ (_ = ?v) =>
-                             eapply (decides_ilist_projections0 v)
-                         | |- decides _ (_ = ?v) =>
-                             eapply (decides_ilist_projections' v)
-                         end.
+             unfold IsProj.
              repeat first[blah | apply decides_eq_refl].
 
-             Ltac match_inside_prim_snd x k:=
-               match x with
-               | prim_snd ?x' => match_inside_prim_snd x' k
-               | ?x' => k x
-               end.
-             Ltac destruct_ilist x:=
-               match type of x with
-               | (ilist []) => destruct x
-               | _ => let y:= fresh "x" in
-                     destruct x as [? y];
-                     destruct_ilist y 
-               end.
              
              match goal with
                |- decides _ (inil = ?x) =>

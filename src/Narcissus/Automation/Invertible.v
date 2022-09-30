@@ -21,8 +21,25 @@ Lemma CInv_equation :
 Proof. intros * ? *  ? HH. rewrite <- HH.
        rewrite CInvRoundTrip; auto. Qed.
 
-(* | For any equation in the hypothesis that uses an invertible function in the left hand side, it moves the function to the right hand side (and solves the secondary generated subgoals) *)
-Ltac subst_invertible_functions:=
+(* Two argument equations.  The following class extends invertibility
+   to functions with two arguments. It simply provides two inversion
+   functions, one for each argument.  *)
+Class ConditionallyInvertibleTwo {A0 A1 B : Type} (F: A0 -> A1 -> B)(P : A0 -> A1 -> Prop)
+  (F0: B -> A0)(F1: B -> A1) :=
+  { CInvTwoRoundTrip0 : forall a0 a1, P a0 a1 -> F0 (F a0 a1) = a0;
+    CInvTwoRoundTrip1 : forall a0 a1, P a0 a1 -> F1 (F a0 a1) = a1}.
+
+(* This lemma restates the invertible condition as a manipulation of
+           equations.   *)   
+Lemma CInvTwo_equation :
+  forall A0 A1 B F P F0 F1 {CInv: @ConditionallyInvertibleTwo A0 A1 B F P F0 F1},
+  forall a0 a1 b, P a0 a1 -> F a0 a1 = b -> a0 = F0 b /\ a1 = F1 b.
+Proof. intros * ? *  ? HH. rewrite <- HH.
+       rewrite CInvTwoRoundTrip0; auto.
+       rewrite CInvTwoRoundTrip1; auto.
+Qed.
+
+Ltac subst_invertible_functions_two :=
   match goal with
   | [ H: ?f ?x = _ |- _ ] =>
       eapply (CInv_equation _ _ f) in H;
@@ -34,6 +51,26 @@ Ltac subst_invertible_functions:=
       try subst x
   end.
 
+(* | For any equation in the hypothesis that uses an invertible function in the left hand side, it moves the function to the right hand side (and solves the secondary generated subgoals) *)
+Ltac subst_invertible_functions:=
+  match goal with
+  | [ H: ?f ?x = _ |- _ ] =>
+      eapply (CInv_equation _ _ f) in H;
+      (*Solve the subgoals of inversion*)
+      [  |
+        (*Find the right typeclass *) now typeclasses eauto  |
+        (* Solve the predicate *) now simpl in *; eauto
+      ];
+      try subst x
+  | H:?f ?x ?y = _
+    |- _ =>
+      eapply (CInvTwo_equation _ _ _ f) in H;
+      (*Solve the subgoals of inversion*)
+      [ (* Split the two resulting equalities *) destruct H |
+        (*Find the right typeclass *) now typeclasses eauto |
+        (* Solve the predicate *) now simpl in *; eauto ]; 
+      try subst x; try subst y
+  end.
 
 (** * Invertable relations *)
 
