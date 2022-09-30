@@ -223,7 +223,8 @@ Ltac apply_combinator_rule'
   (*IndexedSumType*)
   | H: cache_inv_Property _ _ |- context [ CorrectDecoder _ _ _ _ (@IndexedSumType.format_IndexedSumType ?n ?sz ?types _ _ ) _ _ _ ]
     => first [IndexedSumType.apply_IndexedSumTypeWord_Decoder_Correct n types;
-             [  intuition eauto 2 with data_inv_hints (* ^ really only needs `subst_pow2;lia` but that is defined in Solver.v *)
+             [  intuition eauto 2 with data_inv_hints
+             (* ^ really only needs `subst_pow2;lia` but that is defined in Solver.v *)
              | unfold Vector.nth; simpl; eapply H
              | simpl; repeat match goal with
                                |- IterateBoundedIndex.prim_and _ _ =>
