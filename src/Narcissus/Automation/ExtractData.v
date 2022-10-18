@@ -92,6 +92,51 @@ Ltac subst_projections :=
          end;
   unfold Basics.compose, IsProj in *.
 
+
+(* Decides about ilists *)
+Set Printing Implicit.
+Lemma decides_ilist_projections:
+  forall {X Y} (ils: prim_prod X Y) (x:X) (y:Y) (b_x b_y: bool) ,
+    decides b_x (x = ilist.prim_fst ils) -> 
+    decides b_y (y = ilist.prim_snd ils) ->
+    decides (b_x && b_y)
+      (Build_prim_prod x y = ils).
+Proof.
+  simpl.
+  intros.
+  eapply decides_mor_Proper; [reflexivity| | ]; cycle 1.
+  eapply decides_and; eauto.
+  destruct ils; simpl in *.
+  split; intros H1.
+  - inversion H1; auto.
+  - destruct H1; subst; eauto.
+Qed.
+
+(* Lemmas to solve decidability of type  `decided _ (inil = prim_snd (prim_snd .. v) .. )`*)
+Ltac match_inside_prim_snd x k:=
+  match x with
+  | prim_snd ?x' => match_inside_prim_snd x' k
+  | ?x' => k x
+  end.
+Ltac destruct_ilist x:=
+  match type of x with
+  | () => destruct x
+  | (ilist []) => destruct x
+  | _ => let y:= fresh "x" in
+        destruct x as [? y];
+        destruct_ilist y 
+  end.
+
+Ltac decide_inil_eq:=
+  match goal with
+    |- decides _ (inil = ?x) =>
+      match_inside_prim_snd x
+        ltac:(destruct_ilist)
+  end; simpl.
+Ltac decide_ilist:=
+  first [ decide_inil_eq |
+          eapply decides_ilist_projections ].
+
 Create HintDb decide_data_invariant_db.
 Ltac decide_data_invariant :=
   (* Show that the invariant on the data is decideable. Most *)
@@ -115,6 +160,7 @@ Ltac decide_data_invariant :=
                | eapply decides_string_eq
                | eapply decides_Fin_eq
                | eapply decides_EnumType_eq
+               | decide_ilist
                | eapply decides_dec_eq; auto using Peano_dec.eq_nat_dec, weq, pair_eq_dec ].
 
 

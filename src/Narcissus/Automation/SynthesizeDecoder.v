@@ -29,6 +29,7 @@ Require Import
         Fiat.Narcissus.Formats.NatOpt
         Fiat.Narcissus.Formats.Vector
         Fiat.Narcissus.Formats.EnumOpt
+        Fiat.Narcissus.Formats.PermutationOpt
         Fiat.Narcissus.Formats.SumTypeOpt
         Fiat.Narcissus.Formats.StringOpt
         Fiat.Narcissus.Formats.Delimiter
@@ -166,6 +167,20 @@ Ltac apply_combinator_rule'
   first [
   match goal with
 
+  (* Permutations *)
+  |[H: cache_inv_Property _ _ |-
+          CorrectDecoder _ _ _ _ (@permutation_Format _ _ ?types _ _ _) _ _ _ ] =>
+         apply_Permutation_decoder_Correct types;
+        (* several intermediate steps have to be solved with `apply
+           rules` before proceeding. This application order is
+           sensitive and can't be reordered. *)
+        [ clear H; intro H; apply_rules
+        | eapply H
+        | simpl; split_prim_and; apply_rules
+        | intros; simpl; split_prim_and; eauto
+        | unfold iapp
+        ]; apply_rules
+          
   (* Options *)
   | H : cache_inv_Property _ _
     |- context [CorrectDecoder _ _ _ _ (Option.format_option _ _) _ _ _] =>

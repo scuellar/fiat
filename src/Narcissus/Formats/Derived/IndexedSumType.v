@@ -247,7 +247,7 @@ Section Fin.
      1. Index encoded in one Byte
      2. Index encoded in multiple Bytes
    *) 
-  Definition IndexedSumTypeAligneDecoderByte (n numBytes : nat):
+  Definition IndexAligneDecoderByte (n numBytes : nat):
     AlignedDecodeM (Fin.t (S n)) numBytes:=
     BindAlignedDecodeM
       GetCurrentByte
@@ -259,7 +259,7 @@ Section Fin.
             then (fun numBytes0 : nat => ReturnAlignedDecodeM (word2Fin b0))  numBytes
             else ThrowAlignedDecodeM) b).
 
-  Definition IndexedSumTypeAligneDecoder_return (n sz numBytes : nat) (w: word sz):
+  Definition IndexAligneDecoder_return (n sz numBytes : nat) (w: word sz):
     AlignedDecodeM (Fin.t (S n)) numBytes:=
     if
       (lt_dec (@f2n (S n) (word2Fin w)) (pow2 sz) &&
@@ -267,16 +267,16 @@ Section Fin.
     then (fun _ => ReturnAlignedDecodeM (word2Fin w))  numBytes
     else ThrowAlignedDecodeM.
   
-  Definition IndexedSumTypeAligneDecoder (n szB numBytes : nat):
+  Definition IndexAligneDecoder (n szB numBytes : nat):
     AlignedDecodeM (Fin.t (S n)) numBytes:=
     let sz := szB * 8 in
     BindAlignedDecodeM
       (GetCurrentBytes szB)
-      (IndexedSumTypeAligneDecoder_return n (szB*8) numBytes).
+      (IndexAligneDecoder_return n (szB*8) numBytes).
 
   Lemma AlignedDecodeFinByte n:
     DecodeMEquivAlignedDecodeM
-      (Fin_Decoder n 8) (IndexedSumTypeAligneDecoderByte n).
+      (Fin_Decoder n 8) (IndexAligneDecoderByte n).
   Proof.
     unfold Fin_Decoder, sequence_Decode.
     eapply @AlignedDecodeBindCharM; intros; eauto.
@@ -289,9 +289,9 @@ Section Fin.
         addD (addD cd n0) m = addD cd (n0 + m)) ->
     (forall cd : CacheDecode, addD cd 0 = cd) -> 
     DecodeMEquivAlignedDecodeM
-      (Fin_Decoder n (szB * 8)) (@IndexedSumTypeAligneDecoder n szB).
+      (Fin_Decoder n (szB * 8)) (@IndexAligneDecoder n szB).
   Proof.
-    intros; unfold Fin_Decoder, sequence_Decode,IndexedSumTypeAligneDecoder.
+    intros; unfold Fin_Decoder, sequence_Decode,IndexAligneDecoder.
     eapply Bind_DecodeMEquivAlignedDecodeM.
     - eapply AlignedDecodeNCharM; assumption.
     - intros.
@@ -309,7 +309,7 @@ Section Fin.
          t a b0 env)
         (fun numBytes =>
            BindAlignedDecodeM
-             (IndexedSumTypeAligneDecoderByte n numBytes)
+             (IndexAligneDecoderByte n numBytes)
              (fun a => t' a numBytes)).
   Proof.
     intros.
@@ -330,7 +330,7 @@ Section Fin.
          t a b0 env)
         (fun numBytes =>
            BindAlignedDecodeM
-             (IndexedSumTypeAligneDecoder n szB numBytes)
+             (IndexAligneDecoder n szB numBytes)
              (fun a => t' a numBytes)).
   Proof.
     intros.
@@ -1161,3 +1161,6 @@ Section IndexedSumTypeEnum.
 (*     end. *)
   
 End IndexedSumTypeEnum.
+
+
+             

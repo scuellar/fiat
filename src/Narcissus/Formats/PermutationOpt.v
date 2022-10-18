@@ -3,7 +3,7 @@ Set Nested Proofs Allowed.
     We can still add them to automation using the appropriate hooks.
  *)
 
-Require Import
+Require Import 
   Fiat.Narcissus.Common.Notations
   Fiat.Narcissus.Common.Specs
   Fiat.Narcissus.Common.EquivFormat
@@ -38,7 +38,8 @@ Require Import
   Fiat.Narcissus.BinLib.AlignedEncodeMonad
   Fiat.Narcissus.BinLib.AlignedSumType
   Fiat.Narcissus.BinLib.AlignWord
-  Fiat.Narcissus.BinLib.AlignedDecodeMonad.
+  Fiat.Narcissus.BinLib.AlignedDecodeMonad
+  Fiat.Narcissus.BinLib.AlignedDecoders.
 
 (* Automation *)
 Require Import
@@ -46,8 +47,6 @@ Require Import
   Fiat.Narcissus.Automation.ExtractData
   Fiat.Narcissus.Automation.Common
   Fiat.Narcissus.Automation.Invertible.
-
-Require Import Fiat.Narcissus.BinLib.
 
 (*Fin.t*)
 Require Import
@@ -417,11 +416,11 @@ Section List2Ilist.
     end.
   
   Definition filter_decode {S B} (op:option S): DecodeM (S * B) B:=
-    (fun t' ctxD =>
-       match op with
-       | Some s => Some (s, t', ctxD)
-       | _ =>  None
-       end).
+    (fun t' ctxD => Ifopt op as s Then Some (s, t', ctxD) Else None).
+       (* match op with *)
+       (* | Some s => Some (s, t', ctxD) *)
+       (* | _ =>  None *)
+       (* end). *)
 
   
   Definition sortType: forall {m : nat} {types : Vector.t Type m}, list (SumType types) -> option (ilist(B:=id) types). 
@@ -749,7 +748,6 @@ Section ListPermutations.
   Qed.
   
   (** *The Decoder*)
-
   Lemma ito_list_length:
     forall n (types: Vector.t Type n) (ils: ilist types) ,
       (| ito_list ils |) = n.
@@ -836,8 +834,9 @@ Section ListPermutations.
     unfold permutation_ilist_Format, permutation_list_Format, SumType_list_Format.
     normalize_format. (*10.1, 10, 10*)
 
+    (*Ahould have used format_sequence_correct as other formats!? ups*)
     eapply sequence_Compose_format_decode_correct; cycle 1.
-    - (*1*) intros; apply FixList_decode_correct.
+    (*1*) intros; apply FixList_decode_correct.
       eapply IndexedSumType_Decoder_Correct; eassumption.
     - simpl. intros s v Hsource Hperm.
       split.
@@ -965,8 +964,8 @@ Section ListPermutations.
                                                     (ith formats idx)))
              
              (* Change the hypothesis to use
-        `Iterate_Ensemble_BoundedIndex`, so it can easily be unfolded
-        into the list of subproofs. *)
+                `Iterate_Ensemble_BoundedIndex`, so it can easily be unfolded
+                into the list of subproofs. *)
              (Hinvariants_ok: forall (ils : ilist types) (v : list (SumType types)),
                  Permutation (ito_list ils) v ->
                  IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
@@ -994,6 +993,7 @@ Section ListPermutations.
     - (* Turn a quantification of every item in a list with `In`, to an
          iteration ver all the elements with
          `Iterate_Ensemble_BoundedIndex`*)
+      
       clear - Hinvariants_ok.
       intros.
       (* remember (fun idx => view_fin (idx) /\ ith invariants (idx) (ith ils idx)) as pred. *)
@@ -1067,7 +1067,6 @@ Section ObjectPermutation.
 
   
   (** *The Decoder*)
-
 
   Definition permutation_decoder
     {m S}
@@ -1252,7 +1251,171 @@ Section ObjectPermutation.
       + apply Hinvariants_ok in H.
         eapply IterateBoundedIndex.Iterate_Ensemble_BoundedIndex_equiv in H; eauto.   
   Qed.
-         
+
+
+  (** *The aligned decoders*)
+
+  Definition AlignedSortList {m} {types: Vector.t Type (S m)}
+      (b : list (SumType types)) (numBytes :nat): AlignedDecodeM _ numBytes:=
+    Ifopt sortType b as a' Then (return a')%AlignedDecodeM
+                                 Else ThrowAlignedDecodeM.
+    
+  Lemma AlignedDecodeFilter:
+    forall m (types: Vector.t Type (S m))
+      (b : list (SumType types)) ,
+      DecodeMEquivAlignedDecodeM (decode_filter b) (AlignedSortList b).
+  Proof.
+    unfold decode_filter, filter_decode.
+    intros. eapply @AlignedDecode_ifopt.
+    eapply Return_DecodeMEquivAlignedDecodeM. 
+  Qed.
+
+
+  (*Move to the indexed sumtype file*)
+  Definition IndexedSumTypeAligneDecoder { m} {types: Vector.t Type (S m)}
+    (idx_aligned_decoders: forall numBytes : nat, AlignedDecodeM (Fin.t (S m)) numBytes)                    
+    (aligned_decoders: ilist
+                         (B:= fun T => forall numBytes : nat,
+                                  AlignedDecodeM T numBytes) types)
+    numBytes: AlignedDecodeM _ numBytes:=
+      (a <- idx_aligned_decoders numBytes;
+       SumTypeAlignedDecodeM aligned_decoders a)%AlignedDecodeM.
+    
+    Definition IndexedSumTypeAligneDecoder_fin sz { m} {types: Vector.t Type (S m)}
+    (aligned_decoders: ilist
+                         (B:= fun T => forall numBytes : nat,
+                                  AlignedDecodeM T numBytes) types)
+    numBytes: AlignedDecodeM _ numBytes:=
+      (a <- IndexAligneDecoder m sz numBytes;
+       SumTypeAlignedDecodeM aligned_decoders a)%AlignedDecodeM.
+
+    
+    Definition AlignedDecoderPermutation { m} {types: Vector.t Type (S m)} (S:Type)
+      idx_aligned_decoders
+    (aligned_decoders: ilist
+                         (B:= fun T => forall numBytes : nat,
+                                  AlignedDecodeM T numBytes) types)
+    t (n:nat): AlignedDecodeM S n:=
+      (a <- ListAlignedDecodeM (IndexedSumTypeAligneDecoder idx_aligned_decoders aligned_decoders) (Datatypes.S m);
+       a0 <- AlignedSortList a n;
+       t a0 n)%AlignedDecodeM.
+    
+    Definition AlignedDecoderPermutation' sz { m} {types: Vector.t Type (S m)} (S:Type)
+    (aligned_decoders: ilist
+                         (B:= fun T => forall numBytes : nat,
+                                  AlignedDecodeM T numBytes) types)
+    t (n:nat): AlignedDecodeM S n:=
+      (a <- ListAlignedDecodeM (IndexedSumTypeAligneDecoder (IndexAligneDecoder m sz)  aligned_decoders) (Datatypes.S m);
+       a0 <- AlignedSortList a n;
+       t a0 n)%AlignedDecodeM.
+             
+
+
+  Lemma AlignedDecodePermutation:
+    forall m (types: Vector.t Type (S m))
+      (S: Type) (decode_S: ilist(B:=id) types -> DecodeM (S * ByteString) ByteString)
+      (idx_decoder: DecodeM (Fin.t (Datatypes.S m) * ByteString) ByteString)
+      idx_aligned_decoder
+      (idx_aligned_decoder_correct: DecodeMEquivAlignedDecodeM idx_decoder idx_aligned_decoder)
+      (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
+      (t : ilist types ->
+           forall numBytes : nat, AlignedDecodeM S numBytes)
+      (decoder_S_aligned: forall a : ilist types,
+          DecodeMEquivAlignedDecodeM (decode_S a) (t a))
+      (aligned_decoders: ilist
+                           (B:= fun T => forall numBytes : nat,
+                                    AlignedDecodeM T numBytes) types)
+      (decoders_aligned: IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+                           (fun idx : Fin.t (Datatypes.S m) =>
+                              DecodeMEquivAlignedDecodeM (ith decoders idx)
+                                (ith aligned_decoders idx))),
+      DecodeMEquivAlignedDecodeM
+        (permutation_decoder idx_decoder decoders decode_filter decode_S)
+        (AlignedDecoderPermutation S idx_aligned_decoder aligned_decoders t).
+  Proof.
+    intros.
+    eapply DecodeMEquivAlignedDecodeM_trans; [ | intros; reflexivity | ].
+    - (* Real goal*)
+      unfold permutation_decoder, permutation_ilist_decoder, sequence_Decode.
+      eapply @Bind_DecodeMEquivAlignedDecodeM; try eassumption.
+      eapply AlignedDecodeListM; cycle 1.
+      + (* filter *)
+        eapply AlignedDecodeFilter.
+      + unfold decoder_IndexedSumType, sequence_Decode.
+        eapply @Bind_DecodeMEquivAlignedDecodeM.
+        eassumption.
+        intro; eapply AlignedDecodeSumTypeM.
+        eassumption.
+    - intros.
+      eapply BindAlignedDecodeM_assoc.
+  Qed.
+    
+  Lemma AlignedDecodePermutation_fin:
+    forall sz m (types: Vector.t Type (S m))
+      (S: Type) (decode_S: ilist(B:=id) types -> DecodeM (S * ByteString) ByteString)
+      (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
+      (t : ilist types ->
+           forall numBytes : nat, AlignedDecodeM S numBytes)
+      (decoder_S_aligned: forall a : ilist types,
+          DecodeMEquivAlignedDecodeM (decode_S a) (t a))
+      (aligned_decoders: ilist
+                           (B:= fun T => forall numBytes : nat,
+                                    AlignedDecodeM T numBytes) types)
+      (decoders_aligned: IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+                           (fun idx : Fin.t (Datatypes.S m) =>
+                              DecodeMEquivAlignedDecodeM (ith decoders idx)
+                                (ith aligned_decoders idx)))
+      (cache0: forall (cd : CacheDecode) (n0 m0 : nat),
+          addD (addD cd n0) m0 = addD cd (n0 + m0))
+      (cache1: forall cd : CacheDecode, addD cd 0 = cd),
+      DecodeMEquivAlignedDecodeM
+        (permutation_decoder (Fin_Decoder m (sz * 8)) decoders decode_filter decode_S)
+        (AlignedDecoderPermutation S (IndexAligneDecoder m sz) aligned_decoders t).
+  Proof.
+    intros; eapply AlignedDecodePermutation; eauto; eapply @AlignedDecodeFin; assumption.
+  Qed.
+      
+  Lemma AlignedDecodePermutation_enum:
+    forall m (types: Vector.t Type (S m)) codes
+      (S: Type) (decode_S: ilist(B:=id) types -> DecodeM (S * ByteString) ByteString)
+      (decoders: ilist (B:=fun T => DecodeM (T * ByteString) ByteString) types)
+      (t : ilist types ->
+           forall numBytes : nat, AlignedDecodeM S numBytes)
+      (decoder_S_aligned: forall a : ilist types,
+          DecodeMEquivAlignedDecodeM (decode_S a) (t a))
+      (aligned_decoders: ilist
+                           (B:= fun T => forall numBytes : nat,
+                                    AlignedDecodeM T numBytes) types)
+      (decoders_aligned: IterateBoundedIndex.Iterate_Ensemble_BoundedIndex
+                           (fun idx : Fin.t (Datatypes.S m) =>
+                              DecodeMEquivAlignedDecodeM (ith decoders idx)
+                                (ith aligned_decoders idx)))
+      (cache0: forall (cd : CacheDecode) (n0 m0 : nat),
+          addD (addD cd n0) m0 = addD cd (n0 + m0))
+      (cache1: forall cd : CacheDecode, addD cd 0 = cd),
+      DecodeMEquivAlignedDecodeM
+        (permutation_decoder (decode_enum codes) decoders decode_filter decode_S)
+        (AlignedDecoderPermutation S (Aligned_decode_enum codes) aligned_decoders t).
+  Proof.
+    intros; eapply AlignedDecodePermutation; eauto.
+      
+    eapply DecodeMEquivAlignedDecodeM_trans.
+     eapply @AlignedDecodeBindEnum.
+     eapply Return_DecodeMEquivAlignedDecodeM.
+     
+    - simpl; intros.
+      instantiate(1:= codes).
+      unfold DecodeBindOpt2, BindOpt; simpl.
+      unfold BinLib.ByteStringQueueMonoid, ByteStringQueueMonoid.
+      match goal with
+        |- _ = ?X => destruct X as [ [[] ?] |  ]; reflexivity
+      end.
+
+    - simpl; intros.
+      unshelve eapply ReturnAlignedDecodeM_RightUnit.
+      exact S.
+  Qed.
+  
 End ObjectPermutation.
 
 
@@ -1263,3 +1426,31 @@ Global Opaque permutation_Format.
 Create HintDb resilience.
 Global Hint Resolve word_resilience: resilience.
 Global Hint Resolve format_enum_resilience: resilience.
+
+
+(* Instance necessary to invert ilists. *)
+Global Instance icons_invert {A B} {a:A} {n:nat} l  :
+  ConditionallyInvertibleTwo (@icons _ B a n l) (fun _ _ => True) (ilist_hd') (ilist_tl').
+Proof. constructor; reflexivity. Qed.
+
+(* Tactics for applying the correctness lemmas *)
+Ltac apply_Permutation_decoder_Correct types:=
+  let types' := eval unfold types in types in
+    ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
+      ltac:(fun decoders' =>
+              ilist_of_evar (fun T : Type => T -> Prop) types'
+                ltac:(fun invariants' =>
+                        Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
+                          ltac:(fun cache_invariants' =>
+                                  eapply Permutation_decoder_Correct with
+                                  (cache_invariants := cache_invariants')
+                                  (invariants:= invariants')
+                                  (decoders:= decoders')
+           ))).
+
+
+Ltac split_prim_and :=
+  repeat match goal with
+      |- IterateBoundedIndex.prim_and ?x ?y =>
+        apply IterateBoundedIndex.Build_prim_and
+    end; try exact I; simpl; intros.

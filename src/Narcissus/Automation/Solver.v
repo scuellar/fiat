@@ -122,6 +122,9 @@ Proof.
 Qed.
 
 Ltac synthesize_cache_invariant :=
+  unfold IterateBoundedIndex.Iterate_Ensemble_BoundedIndex,
+        IterateBoundedIndex.Iterate_Ensemble_BoundedIndex',
+        Vector.nth; simpl;
   (* Synthesize an invariant satisfying the derived constraints *)
   (* on the cache. *)
   solve [repeat (instantiate (1 := fun _ => True));

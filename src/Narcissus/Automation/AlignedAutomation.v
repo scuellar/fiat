@@ -112,6 +112,7 @@ Ltac align_decoders_step :=
       eapply DecodeMEquivAlignedDecodeM_trans;
       [ | intros; reflexivity
       |  ]
+    | eapply @PermutationOpt.AlignedDecodePermutation_enum; intros
     | eapply @IndexedSumType.AlignedDecodeFinByte; intros; eauto
     | eapply @IndexedSumType.AlignedDecodeFinByte_Bind; intros; eauto
     | eapply @AlignedDecodeSumTypeM; intros; eauto
