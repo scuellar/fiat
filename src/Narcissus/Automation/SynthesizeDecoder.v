@@ -169,8 +169,8 @@ Ltac apply_combinator_rule'
 
   (* Permutations *)
   |[H: cache_inv_Property _ _ |-
-          CorrectDecoder _ _ _ _ (@permutation_Format _ _ ?types _ _ _) _ _ _ ] =>
-         apply_Permutation_decoder_Correct types;
+          CorrectDecoder _ _ _ _ (@permutation_Format _ ?n ?types _ _ _) _ _ _ ] =>
+         apply_Permutation_decoder_Correct n types;
         (* several intermediate steps have to be solved with `apply
            rules` before proceeding. This application order is
            sensitive and can't be reordered. *)

@@ -60,7 +60,6 @@ Module SumTypeCodes2.
   Let encode := encoder_impl enc_dec.
   
   Let decode := decoder_impl enc_dec.
-    Print Assumptions decode.
     
 End SumTypeCodes2.
 
