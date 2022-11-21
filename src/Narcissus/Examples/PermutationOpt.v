@@ -30,91 +30,16 @@ Notation "{{ x ; .. ; y }}" := (Build_prim_prod x .. (Build_prim_prod y tt) .. )
 (*Ituples are just simple `ilist`s where the type function is trivial. *)
 Definition ituple {n} tys: Type:= @ilist _ id n tys.
 
-
-
-(*----------  Start empty lemms to move *)
-
-             Lemma decides_ilist_projections':
-               forall {a n l} ils x y b_x b_y ,
-                 decides b_x (x = prim_fst ils) -> 
-                 decides b_y (y = prim_snd ils) ->
-                 decides (b_x && b_y)
-                   (@icons Type id a n l x y = ils).
-             Proof.
-               simpl.
-               intros.
-               eapply decides_mor_Proper; [reflexivity| | ]; cycle 1.
-               eapply decides_and; eauto.
-               destruct ils; simpl in *.
-               split; intros H1.
-               - inversion H1; auto.
-               - destruct H1; subst; eauto.
-             Qed.
-             Lemma decides_ilist_projections0:
-               forall {a} ils x y b_x b_y ,
-                 decides b_x (x = prim_fst ils) -> 
-                 decides b_y (y = prim_snd ils) ->
-                 decides (b_x && b_y)
-                   (@icons Type id a 0 (Vector.nil _) x y = ils).
-             Proof.
-               intros.
-               eapply decides_ilist_projections'; eauto.
-             Qed.
-             
-             Lemma decides_ilist_projections:
-               forall {a n l} (ils: ilist(B:=id) (Vector.cons Type a n l)) x y b_x b_y ,
-                 decides b_x (x = prim_fst ils) -> 
-                 decides b_y (y = prim_snd ils) ->
-                 decides (b_x && b_y)
-                   (icons x y = ils).
-             Proof.
-               simpl; intros. eapply decides_ilist_projections'; eauto.
-             Qed.
-
-             
-             Ltac decide_ilist_projection:= match goal with
-                         | |- decides _ (_ = ?v) =>
-                             eapply (decides_ilist_projections v)
-                         | |- decides _ (_ = ?v) =>
-                             eapply (decides_ilist_projections0 v)
-                         | |- decides _ (_ = ?v) =>
-                             eapply (decides_ilist_projections' v)
-                                            end.
-             
-
-             (* Add this to the automation of Indexedsumtype*)
-             Ltac split_prim_and :=
-               repeat match goal with
-                   |- IterateBoundedIndex.prim_and ?x ?y =>
-                     apply IterateBoundedIndex.Build_prim_and
-                 end; try exact I; simpl; intros.
-             
-(*----------  end empty lemms to move *)
-
-
-             (*the application tactic*)
-             
-        Ltac apply_Permutation_decoder_Correct types:=
-          let types' := eval unfold types in types in
-            ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
-              ltac:(fun decoders' =>
-                      ilist_of_evar (fun T : Type => T -> Prop) types'
-                        ltac:(fun invariants' =>
-                                Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
-                                  ltac:(fun cache_invariants' =>
-                                          eapply Permutation_decoder_Correct with
-                                          (cache_invariants := cache_invariants')
-                                          (invariants:= invariants')
-                                          (decoders:= decoders')
-                   ))).
-
 (** * Simple permutation (two formats)*)
 (* | In this module we present the simplest example of using IndexedSumType.
    It encodes either an 8bit woord or an 16bit word.
    The index is encoded using a word directly representing the index.
  *)
-Module Permutation.
 
+Module SimplPermutation.
+  (* Simple permutation of two elements, indexed by a code/label *)
+
+  
   Let types:= [word 8:Type; word 16:Type].
 
   Definition formats : ilist (B := fun T => FormatM T ByteString) types
@@ -147,105 +72,91 @@ Module Permutation.
     eauto with resilience.
   Definition inv (msg: message):= True.
 
-
   
   Let enc_dec : EncoderDecoderPair (permutation_Format myProjections myFinFormat myFormats) inv.
   Proof.
-    unfold myFinFormat.
+    unfold myFormat, myFinFormat.
     (* derive_encoder_decoder_pair. *)
-    econstructor.
-    - synthesize_aligned_encoder.
-    - (* synthesize_aligned_decoder*)
-      start_synthesizing_decoder.
-      + normalize_format.
-        (* Set Printing Implicit. *)
-        apply_Permutation_decoder_Correct types;
-          (* several intermediate steps have to be solved with `apply
-          rules` before proceeding. This application is sensitive and
-          can't be reordered. *)
-        [ clear H; intro H; apply_rules
-        | eapply H
-        | simpl; split_prim_and; apply_rules
-        | intros; simpl; split_prim_and; eauto
-        | unfold iapp
-        ].
-        (* ExtractSource *)
-        simpl; intros; eapply CorrectDecoderEmpty.
-        -- (* build_fully_determined_type. *)
-          
-          Instance icons_invert {A B} {a:A} {n:nat} l  :
-            ConditionallyInvertibleTwo (@icons _ B a n l) (fun _ _ => True) (ilist_hd') (ilist_tl').
-          Proof. constructor; reflexivity. Qed.
-          
-          build_fully_determined_type.
-        -- eapply decides_and; [apply decides_True' | ].
-           
-           Lemma decides_ilist_projections1:
-               forall {X Y} (ils: prim_prod X Y) (x:X) (y:Y) b_x b_y ,
-                 decides b_x (x = prim_fst ils) -> 
-                 decides b_y (y = prim_snd ils) ->
-                 decides (b_x && b_y)
-                   (Build_prim_prod x y = ils).
-             Proof.
-               simpl.
-               intros.
-               eapply decides_mor_Proper; [reflexivity| | ]; cycle 1.
-               eapply decides_and; eauto.
-               destruct ils; simpl in *.
-               split; intros H1.
-               - inversion H1; auto.
-               - destruct H1; subst; eauto.
-             Qed.
+    econstructor;
+      [ synthesize_aligned_encoder |  ].
 
-             repeat first[  eapply decides_ilist_projections1 | apply decides_eq_refl].
+   (* synthesize_aligned_decoder. *)
+   start_synthesizing_decoder.
+   - normalize_format. apply_rules.
+   - cbv beta; synthesize_cache_invariant.
+   - cbv beta; unfold decode_nat, sequence_Decode;
+    optimize_decoder_impl.
+   - cbv beta; align_decoders.
+     
+    Unshelve.
+    constructor.
+  Defined.
+
+  
+  Let encode := encoder_impl enc_dec.
+  
+  Let decode := decoder_impl enc_dec.
+  Print Assumptions decode.
 
 
-             
-             Ltac match_inside_prim_snd x k:=
-               match x with
-               | prim_snd ?x' => match_inside_prim_snd x' k
-               | ?x' => k x
-               end.
-             Ltac destruct_ilist x:=
-               match type of x with
-               | () => destruct x
-               | (ilist []) => destruct x
-               | _ => let y:= fresh "x" in
-                     destruct x as [? y];
-                     destruct_ilist y 
-               end.
-             
-             match goal with
-               |- decides _ (inil = ?x) =>
-                 match_inside_prim_snd x
-                   ltac:(destruct_ilist)
-             end; simpl.
-             apply decides_eq_refl.
-           
-      + cbv beta; synthesize_cache_invariant.
-      + cbv beta; unfold decode_nat, sequence_Decode;
-          optimize_decoder_impl.
-      + simpl.
-        unfold permutation_ilist_decoder, decode_filter, sequence_Decode.
-        cbv beta. align_decoders.
-        ltac:(cbv beta; unfold decode_nat, sequence_Decode;
-              optimize_decoder_impl) ltac:(cbv beta; align_decoders)
+End SimplPermutation.
 
-                                            Ltac apply_new_combinator_rule ::=
-          eapply Permutation_decoder.
-        synthesize_aligned_decoder.
+Module TopPermutation.
+  (* Just like a SimplPermutation, but encodes five elements. *)
 
+  Let types:= [word 8:Type; word 16:Type; word 32:Type; word 64:Type].
+  
+  Let invariants := ilist_constant_T types.
+  Let view_fin {n} (f:Fin.t n):= f2n f < pow2 8.
+  Let invariant := (fun st : SumType types =>
+                      view_fin (SumType_index types st) /\ ith invariants (SumType_index types st) (SumType_proj types st)).
 
-        *)
-(*
+  Record message := {
+      label1 : word 8
+    ; label2 : word 16
+    ; label3 : word 32
+    ; label4 : word 64                   
+    }.
 
+  Let myProjections: ilist (B:=fun T => _ -> T) types := {{ label1 ; label2 ; label3 ; label4 }}.
+  Let myTypes {n: nat} {types: Vector.t Type n} {B} (list: ilist (B:=B) types): Vector.t Type n:= types.
+  
+  Let myCodes: Vector.t (word 8) 4:= [[ natToWord _ 1; natToWord _ 2; natToWord _ 3; natToWord _ 4 ]].
+  Let myFinFormat:= (format_enum myCodes).
+  
+  Let myFormats: ilist (B := fun T => FormatM T ByteString) (myTypes myProjections)
+      := {{ format_word; format_word; format_word; format_word }}.
+  
+  Ltac new_encoder_rules ::=
+    eapply Permutation_Encoder_Correct;
+    [| unfold Vector.nth; repeat constructor | |IndexedSumType.split_iterate ]; simpl;
+    eauto with resilience.
 
+  Definition inv (msg: message):= True.
 
+  Definition myFormat:= permutation_Format myProjections myFinFormat myFormats.
+    
+  Let enc_dec : EncoderDecoderPair myFormat inv.
+  Proof.
+    unfold myFormat, myFinFormat.
+    derive_encoder_decoder_pair.
+    
+    Unshelve.
+    constructor.
+  Defined.
 
+  
+  Let encode := encoder_impl enc_dec.
+  
+  Let decode := decoder_impl enc_dec.
+  Print Assumptions decode.
 
+  Goal forall m b x, decode m b  = x.
+    unfold decode.
 
-
-
+  
+End TopPermutation.
+  
 
 
 
