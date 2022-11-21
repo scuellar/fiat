@@ -830,7 +830,6 @@ Section ListPermutations.
           cache_inv
           (@permutation_ilist_Format m types fin_format formats).
   Proof.
-    (* Real goal*)
     unfold permutation_ilist_Format, permutation_list_Format, SumType_list_Format.
     normalize_format. (*10.1, 10, 10*)
 
@@ -1434,13 +1433,13 @@ Global Instance icons_invert {A B} {a:A} {n:nat} l  :
 Proof. constructor; reflexivity. Qed.
 
 (* Tactics for applying the correctness lemmas *)
-Ltac apply_Permutation_decoder_Correct types:=
+Ltac apply_Permutation_decoder_Correct n types:=
   let types' := eval unfold types in types in
     ilist_of_evar (fun T => DecodeM (T * ByteString) ByteString) types'
       ltac:(fun decoders' =>
               ilist_of_evar (fun T : Type => T -> Prop) types'
                 ltac:(fun invariants' =>
-                        Vector_of_evar 2 (Ensembles.Ensemble (CacheDecode -> Prop))
+                        Vector_of_evar n (Ensembles.Ensemble (CacheDecode -> Prop))
                           ltac:(fun cache_invariants' =>
                                   eapply Permutation_decoder_Correct with
                                   (cache_invariants := cache_invariants')
