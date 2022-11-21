@@ -46,7 +46,7 @@ Ltac subst_invertible_functions_two :=
       (*Solve the subgoals of inversion*)
       [  |
         (*Find the right typeclass *) now typeclasses eauto  |
-        (* Solve the predicate *) now simpl in *; eauto
+        (* Solve the predicate *) now simpl in *; eassumption
       ];
       try subst x
   end.
@@ -59,7 +59,7 @@ Ltac subst_invertible_functions:=
       (*Solve the subgoals of inversion*)
       [  |
         (*Find the right typeclass *) now typeclasses eauto  |
-        (* Solve the predicate *) now simpl in *; eauto
+        (* Solve the predicate *) now simpl in *; eassumption
       ];
       try subst x
   | H:?f ?x ?y = _
