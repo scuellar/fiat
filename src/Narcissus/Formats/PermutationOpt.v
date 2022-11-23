@@ -8,6 +8,7 @@ Require Import
   Fiat.Narcissus.Common.Specs
   Fiat.Narcissus.Common.EquivFormat
   Fiat.Narcissus.Common.ComposeOpt
+  Fiat.Narcissus.Common.ParametricSort
   Fiat.Narcissus.Formats.Base.FMapFormat
   Fiat.Narcissus.Formats.Base.SequenceFormat
   Fiat.Narcissus.Formats.StringOpt
@@ -385,9 +386,19 @@ End Resilience.
 
 
 Section List2Ilist.
-  (* In this section we create an empty_Format, that can translate a
-  given `list (SumType types)` to an `ilist(B:=id) types` (with possibility of failure). *)
+  (* In this section we construct the functions to go from ilist to
+    list and back. The key functions are:
 
+    * `ito_list`: Maps an heterogeneous list into a homogeneous list
+       of SumTypes. Specifically, it maps `ilist(B:=id) types` to a
+       `list (SumType types)`.
+
+    * `ifrom_list`: Maps a homogeneous list of SumTypes back into the
+      heterogeneous list, failing if the elements are not all there in
+      the right order. Specifically, it maps `list (SumType types)`
+      into a `option (ilist(B:=id) types)`.
+
+   *)
   
   Definition lift_SumType (A:Type) {n:nat} {types:Vector.t Type n} :
     SumType types -> SumType (Vector.cons Type A _ types):=
@@ -401,7 +412,10 @@ Section List2Ilist.
         fun elem => inr elem
     end.
 
-  
+  (** *ito_list*)
+  (** Maps an heterogeneous list into a homogeneous list of
+  SumTypes. Specifically, it maps `ilist(B:=id) types` to a `list
+  (SumType types)`. *)
   Fixpoint ito_list {n:nat} {types:Vector.t Type n}:
     ilist (B:=id) types -> list (SumType types):=
     match types as typs return
@@ -414,60 +428,493 @@ Section List2Ilist.
           (inj_SumType typs Fin.F1 (prim_fst ils))
             :: map (lift_SumType a) (ito_list (prim_snd ils))
     end.
-  
-  Definition filter_decode {S B} (op:option S): DecodeM (S * B) B:=
-    (fun t' ctxD => Ifopt op as s Then Some (s, t', ctxD) Else None).
-       (* match op with *)
-       (* | Some s => Some (s, t', ctxD) *)
-       (* | _ =>  None *)
-       (* end). *)
+
+  (** *ifrom_list*)
+  (** Maps a homogeneous list of SumTypes back into the
+      heterogeneous list, failing if the elements are not all there in
+      the right order. Specifically, it maps `list (SumType types)`
+      into a `option (ilist(B:=id) types)`. *)
+
+  (*We use some definitions/notation to make the function readable
+    NOTE: These definitions should be global and the notation should
+    be generic over a typeclass for Monads. However Narcissus alrady
+    defines many of these notations in a weaker way so we are stuck
+    doing this local notation where necessary.  *)
+  Definition DecodeBindOpt'
+             {A B C}
+             (a : option (A * B))
+             (k : A -> B -> option C)
+    : option C :=
+    BindOpt a (fun a => let (a, b) := a in k a b).
+  Bind Scope option_scope with option.
+  Declare Scope option_scope.
+  Delimit Scope option_scope with opt.
+  Open Scope option_scope.
+  Notation "x <- y ; z" := (BindOpt y (fun x => z))
+                             (at level 81, right associativity,
+                               format "'[v' x  <-  y ; '/' z ']'") : option_scope.
+  Notation "`( a , b ) <- c ; k" :=
+    (DecodeBindOpt' c (fun a b => k)) : option_scope.
+
+  (* gets the head and tail of a list, if any, otherwise returns None. *)
+  Definition getCons {A} (ls:list A): option (A * list A):=
+    match ls with
+    | [] => None 
+    | hd::tl => Some (hd,tl)
+    end.
+
+  Definition dropSumType {n : nat} {types : Vector.t Type n} {A:Type}:
+    SumType (Vector.cons Type A n types) -> option (SumType types):=
+    match
+      types as t in (Vector.t _ n)
+      return (SumType (Vector.cons Type A n t) -> option (SumType t))
+    with
+    | @Vector.nil _ => constant None
+    | @Vector.cons _ h n types0 =>
+        fun elem0 : SumType _ => match elem0 with
+                              | inl _ => None
+                              | inr elem1 => Some elem1
+                              end
+    end.
 
   
-  Definition sortType: forall {m : nat} {types : Vector.t Type m}, list (SumType types) -> option (ilist(B:=id) types). 
+  (* Add a SumType to the head of an ilist, if and only if it has the right type (i.e. the first type) *)
+  Definition ilist_cons {n:nat} {types:Vector.t Type n} {t0}
+    (el: SumType (Vector.cons Type t0 n types)) (ils: ilist types) :
+    option (ilist (Vector.cons Type t0 n types)) :=
+    match
+      types as t in (Vector.t _ n1)
+      return
+      (SumType (Vector.cons Type t0 n1 t) ->
+       ilist t -> option (ilist (Vector.cons Type t0 n1 t)))
+    with
+    | @Vector.nil _ =>
+        (* Type list is empty, so the element is necessarily the first
+        one (i.e. `t0`) *)
+        fun el ils => Some {| prim_fst := el; prim_snd := ils |}
+    | @Vector.cons _ t1 n1 types1 =>
+        (* The typelist is not empty, we need to check that the
+        element is of type `t0`. We just need to check it's
+        constructor is `inl` *)
+        fun el ils => match el with
+                   | inl firstType =>
+                       Some {| prim_fst := firstType; prim_snd := ils |}
+                   | inr _ => None
+                   end
+    end el ils.
+  
+  (* Like `traverse`, specialized to `list`s and `option` *)
+  Fixpoint traverseOp {a b: Type} (f: a -> option b) (ls: list a): option (list b):=
+    match ls with
+      [] => Some []
+    | hd::tl => match (f hd, traverseOp f tl) with
+              | (None, _) => None
+              | (_, None) => None
+              | (Some hd', Some tl') => Some (hd' :: tl')
+              end
+    end.
+
+  (* Take a list of `SumType`s and remove the frist type
+            from the vector, if the list doesn't contain anything of
+            that type. Otherwise, return None.*)
+  Definition dropListSumType {n : nat} {types : Vector.t Type n} {A:Type}:
+    list (SumType (Vector.cons _ A n types)) -> option (list (SumType types)):=
+    traverseOp dropSumType.
+  
+  Fixpoint ifrom_list {n:nat} {types:Vector.t Type n}
+    {struct types}: list (SumType types) -> option (ilist (B:=id) types):=
+    match
+      types as t in (Vector.t _ n0)
+      return (list (SumType t) -> option (ilist t))
+    with
+    | @Vector.nil _ =>
+        fun ls0 => match ls0 with
+                | [] => Some ()
+                | s :: _ => let H := match s return (option ()) with
+                                   end in H
+                end
+    | @Vector.cons _ h n0 types0 =>
+        fun ls0 =>
+          (* Make sure the list has another element*)
+          `(s, ls1) <- getCons ls0;
+  (* Drop the types of the tail to call `ifrom_list` recursively*)
+  ls3 <- dropListSumType ls1;
+  ls5 <- @ifrom_list n0 types0 ls3;
+  (* Append the new head to the `ilist` *)
+  ilist_cons s ls5
+  end.
+  Close Scope option_scope.
+
+
+  (* #Inverses: These two functions are inverses of each other. *)
+  
+  Lemma ifrom_ito_list:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ls : list (SumType types))
+      (ils : ilist types),
+      ifrom_list ls = Some ils ->
+      ito_list ils = ls.
+  Proof.
   Admitted.
-  Definition decode_filter {m} {types : Vector.t Type m} (v : list (SumType types)):
-    DecodeM ((ilist(B:=id) types) * ByteString)  ByteString:= (filter_decode (sortType v)).
-
   
+  Lemma ito_ifrom_list:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ils : ilist types),
+      ifrom_list (ito_list ils) = Some ils.
+  Proof.
+  Admitted.
+  
+End List2Ilist.
+
+
+Section SortIlist.
+  (* This section defines the functions to sort `list (SumType types)`
+   and `ilist`s and proves the approriate properties about them and
+   their relationships.  The key definitions are:
+
+   * `SumTypeSort` a function that orders lists of SumType's, based on
+     the index of the sumtype.
+
+   * `sortToIlist` that translates a list of SumTypes, to an ilist, by
+     first ordering it.
+
+   *)
+
+  (** + `SumTypeSort` a function that orders lists of SumType's, based on the index of the sumtype. *)
+
+  (* | SumTypeLt : Less than for `SumType`'s *)
+  Definition finTLe {n} (ft1 ft2 : Fin.t n): bool:=
+    nat_leb (f2n ft1) (f2n ft2).
+  Definition SumTypeLt {m : nat} {types : Vector.t Type m} (s1 s2 : SumType types): bool :=
+    finTLe (SumType_index _ s1) (SumType_index _ s2).
+  Lemma SumTypeLt_inl_inr:
+    forall {n : nat}
+      {types : Vector.t Type n},
+    forall A1 A2  x y,
+      @SumTypeLt _ (Vector.cons _ A1 _ (Vector.cons _ A2 _ types)) (inl x) (inr y).
+  Proof. constructor. Qed.
+  
+  Lemma SumTypeLt_inr_inl:
+    forall {n : nat}
+      {types : Vector.t Type n},
+    forall A1 A2  x y,
+      ~ @SumTypeLt _ (Vector.cons _ A1 _ (Vector.cons _ A2 _ types)) (inr y) (inl x).
+  Proof.
+    intros ** ?. inversion H.
+    unfold SumTypeLt, finTLe, SumType_index in H1.
+    rewrite <- f2n_FS in H1; inversion H1.
+  Qed.
+  Lemma SumTypeLt_lift:
+    forall h {n : nat}
+      {types : Vector.t Type n},
+    forall (x y : SumType types),
+      SumTypeLt (lift_SumType h x) (lift_SumType h y) =
+        SumTypeLt x y.
+  Proof.
+    destruct types.
+    - simpl. destruct x.
+    - simpl.
+      induction types; simpl.
+      + intros. unfold SumType in *; reflexivity.
+      + intros. 
+        unfold SumTypeLt; simpl.
+        unfold SumType_index.
+        Lemma finTLe_FS:
+          forall n (x y:Fin.t n), finTLe (Fin.FS x) (Fin.FS y) = finTLe x y.
+        Proof.
+          intros.
+          unfold finTLe, f2n, proj1_sig; simpl.
+          destruct (Fin.to_nat x); destruct (Fin.to_nat y); reflexivity.
+        Qed.
+        eapply finTLe_FS.
+  Qed.
+  
+  Lemma SumTypeLt_lift':
+    forall h {n : nat}
+      {types : Vector.t Type n},
+      (fun x y => is_true (SumTypeLt (lift_SumType h x) (lift_SumType h y))) =
+        (fun x y => SumTypeLt(types:=types) x y).
+  Proof.
+    intros. extensionality x; extensionality y.
+    rewrite SumTypeLt_lift; reflexivity.
+  Qed.
+  
+  Definition SumTypeSort {m : nat} {types : Vector.t Type m} := sort (@SumTypeLt m types).
+
+  (** + SortToIlist: a function to reorder lists of sumtypes! *)
+  (* | Reorders a list, and turns it back into an ilist. This
+         function might fail if the input does not have all the
+         entries (as determined by `types`) or has repeated elements.
+
+         This version uses MergeSort which is O(n log n). However, it
+         still uses `ifrom_list` which is unfortunately O(n^2).  *) 
+
+  Definition sortToIlist {m : nat} {types : Vector.t Type m}
+    (ls : list (SumType types)): option (ilist(B:=id) types):=
+    ifrom_list (SumTypeSort ls). 
+
+  (** + Properties of sorting. *)
+
+  Lemma Permutation_SumTypeSort:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ls : list (SumType types)),
+      Permutation (SumTypeSort ls) ls.
+  Proof. symmetry; eapply Permuted_sort. Qed.
+
+  (* | All elements in a list, produced by `ito_list`, are different
+     as given SumType constructors*)
+  Inductive allDifferent {A} (R: relation A): list A -> Prop :=
+  | AllFidNil: allDifferent R []%list
+  | AllFidCons: forall a ls, allDifferent R ls
+                        -> Forall (fun b=> ~ (R a b) \/ ~ (R b a)) ls
+                        -> allDifferent R (a::ls).
+  
+  Lemma allDifferent_map:
+    forall A B (R:relation B) (f: A -> B) ls,
+      allDifferent (fun x y => R (f x) (f y)) ls ->
+      allDifferent R (map f ls).
+  Proof.
+  Admitted.
+  Lemma StronglySorted_map:
+    forall A B (R:relation B) (f: A -> B) ls,
+      Sorted.StronglySorted (fun x y => R (f x) (f y)) ls ->
+      Sorted.StronglySorted R (map f ls).
+  Proof.
+  Admitted.
+
+  Lemma Permutation_Sorted_eq:
+    forall A (R: relation A) (ls1 ls2 : list A)
+      (* (Hantisym: antisymmetric _ R) *)
+      (HallDiff: allDifferent R ls1),
+      Permutation ls1 ls2 ->
+      Sorting.Sorted.StronglySorted R ls1 ->
+      Sorting.Sorted.StronglySorted R ls2 ->
+      ls1 = ls2.
+  Proof.
+    induction ls1 as [| a tl1].
+    - intros. apply Permutation_nil in H; subst; reflexivity.
+    - intros.
+      (* a is in ls2. *)
+      eapply Permutation_in in H as HIn2; [ |left; reflexivity].
+      (* a is smaller than all others. *)
+      inversion H0; subst; clear H0.
+      (* a must be the head of ls2 *)
+      destruct ls2 as [|a' tl2]; [ inversion HIn2|]. 
+
+      inversion HIn2.
+      + (*a = a' *)  subst. f_equal; eapply IHtl1; try eassumption.
+        * inversion HallDiff; auto.
+        * eapply Permutation_cons_inv; eassumption.
+        * inversion H1; eassumption.
+      + (* In a tl2, so a' can't be in ls1!*)
+        inversion H1; subst.
+        symmetry in H;
+          eapply Permutation_in in H as HIn1; [ |left; reflexivity].
+        destruct HIn1.
+        * subst. f_equal; eapply IHtl1; try eassumption.
+          -- inversion HallDiff; auto.
+          -- symmetry; eapply Permutation_cons_inv; eassumption.
+        * exfalso.
+          inversion HallDiff; subst.
+          eapply Forall_forall1_transparent in H10.
+          2: eapply H2.
+          destruct H10 as [HH|HH]; apply HH.
+          -- eapply Forall_forall1_transparent in H5; eauto.
+          -- eapply Forall_forall1_transparent in H7; eauto.
+  Qed.
+  
+  Lemma ito_list_allDifferent:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ils : ilist types),
+      allDifferent (SumTypeLt(types:=types))  (ito_list ils).
+  Proof.
+    induction types.
+    - simpl. intros; constructor.
+    - intros. destruct ils.
+      destruct types eqn:HH.
+      + do 2 constructor.
+      + constructor.
+        * eapply allDifferent_map.
+          rewrite SumTypeLt_lift'.
+          eapply IHtypes.
+        *  simpl.
+           match goal with
+             |- Forall ?P ?X =>
+               remember P as p
+           end.
+           constructor.
+           -- subst p.
+              right. eapply SumTypeLt_inr_inl.
+           -- match goal with
+                |- Forall ?p (map ?f1 ?ls) =>
+                  remember p as P; remember ls as LS
+              end.
+              clear - Heqp.
+              induction LS.
+              ++ constructor.
+              ++ constructor. 
+                 ** subst P; right. apply SumTypeLt_inr_inl.
+                 ** eapply IHLS.
+  Qed.
+
+  Lemma ito_list_Sorted:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ils : ilist types),
+      Sorted.StronglySorted (SumTypeLt(types:=types))
+        (ito_list ils).
+  Proof.
+    (* Proof is similar to `ito_list_allDifferent` modularize?*)
+    induction types.
+    - simpl. intros; constructor.
+    - intros. destruct ils.
+      destruct types eqn:HH.
+      + do 2 constructor.
+      + constructor.
+        * eapply StronglySorted_map.
+          rewrite SumTypeLt_lift'.
+          eapply IHtypes.
+        * simpl.
+          match goal with
+            |- Forall ?P ?X =>
+              remember P as p
+          end.
+          constructor.
+          -- subst p.
+             eapply SumTypeLt_inl_inr.
+          -- match goal with
+               |- Forall ?p (map ?f1 ?ls) =>
+                 remember p as P; remember ls as LS
+             end.
+             clear - Heqp.
+             induction LS.
+             ++ constructor.
+             ++ constructor. 
+                ** subst P. apply SumTypeLt_inl_inr.
+                ** eapply IHLS.
+  Qed.
+
+  Lemma total_SumTypeLt:
+    forall {n : nat}
+      {types : Vector.t Type n},
+    forall x y : SumType types, SumTypeLt x y = true \/ SumTypeLt y x = true.
+  Proof.
+    intros.
+    unfold SumTypeLt.
+    unfold finTLe.
+    Definition total_nat_leb: forall n1 n2,
+        nat_leb n1 n2 \/ nat_leb n2 n1.
+    Proof. induction n1; destruct n2; eauto. Qed.
+    eapply total_nat_leb.
+  Qed.
+  Lemma Transitive_nat_leb: Transitive nat_leb.
+  Proof.
+    intros n1;
+      induction n1.
+    - intros n2; destruct n2; eauto.
+    - intros n2; destruct n2; eauto.
+      + simpl; intros; congruence.
+      + simpl; intros n3; destruct n3; eauto.
+  Qed.
+  Lemma Transitive_SumTypeLt: 
+    forall {n : nat}
+      {types : Vector.t Type n},
+      Transitive (@SumTypeLt _ types).
+
+    unfold Transitive.
+    unfold SumTypeLt, finTLe.
+    intros ?????.
+    eapply Transitive_nat_leb.
+  Qed. 
+  Lemma SumTypeSort_Permutation:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ls : list (SumType types))
+      (ils : ilist types),
+      Permutation (ito_list ils) ls ->
+      SumTypeSort ls = ito_list ils.
+  Proof.
+    unfold SumTypeSort.
+    intros.
+    symmetry; eapply Permutation_Sorted_eq; eauto.
+    - eapply ito_list_allDifferent.
+    - etransitivity; try eassumption.
+      eapply Permuted_sort.
+    - eapply ito_list_Sorted.
+    - eapply @StronglySorted_sort.
+      + apply total_SumTypeLt.
+      + apply Transitive_SumTypeLt.
+  Qed.
+  Lemma sortToIlist_Permutation_inverse:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ls : list (SumType types))
+      (ils : ilist types),
+      Permutation (ito_list ils) ls ->
+      sortToIlist ls = Some ils.
+  Proof.
+    unfold sortToIlist. intros.
+    rewrite <- ito_ifrom_list.
+    erewrite SumTypeSort_Permutation; eauto.
+  Qed.
+  Lemma Permutation_sortToIlist_inverse:
+    forall {n : nat}
+      {types : Vector.t Type n}
+      (ls : list (SumType types))
+      (ils : ilist types),
+      sortToIlist ls = Some ils -> Permutation (ito_list ils) ls.
+  Proof.
+    unfold sortToIlist.
+    intros.
+    etransitivity; cycle 1.
+    - apply Permutation_SumTypeSort.
+    - unfold SumTypeSort in *.
+      remember (sort SumTypeLt ls) as sorted_ls.
+      erewrite ifrom_ito_list; eauto.
+  Qed.
+  
+End SortIlist.
+
+Section SortDecodeCorrect.
+  (* Last section defined `sort_filter` to sort `lists` into
+     `ilist`. This section proves that `sort_filter` is a correct
+     decoder for the `empty_format`, that sorts a `list (SumType
+     types)` (existing in the context) and translates it into an
+     ilist.
+
+     The key difficulty in proving the lemma
+     `sort_list_SumType_Correct_Decoder`, at the end of the section,
+     is to take into account the failure in decoding. *)
+
+  (* We generalize the notion of `decides` to include the possibility
+     of failure.  While decides has type
+
+    ``` decides : bool -> Prop -> Prop ```
+
+    We define a new predicate that has type
+
+    ``` decidesOpt : option a -> (a -> Prop) -> Prop ```
+
+    Which encodes the fact that, if decoding went wrong, then it
+    was impossible to satisfy the predicate in the first place.
+
+   *)
   Definition decidesOpt {a} (op: option a) (predicate: a -> Prop):=
     Ifopt op as s Then predicate s Else forall s, ~ predicate s.
   
-  
   Definition decidesOptBool {a} (op: option a) (b: a -> bool) (predicate: a -> Prop):=
     Ifopt op as s Then (General.decides (b s) (predicate s)) Else forall s, ~ predicate s.
+  
 
-  
-  
-  
-  Definition filter_decode_bool {S B} (op:option S) (b:S -> bool) : DecodeM (S * B) B:=
-    (fun t' ctxD =>
-       match op with
-       | Some s => if (b s) then Some (s, t', ctxD) else None
-       | _ =>  None
-       end).
+  Definition filter_decode {S B} (op:option S): DecodeM (S * B) B:=
+    (fun t' ctxD => Ifopt op as s Then Some (s, t', ctxD) Else None).
+  Definition sort_filter {m} {types : Vector.t Type m} (v : list (SumType types)):
+    DecodeM ((ilist(B:=id) types) * ByteString)  ByteString:= (filter_decode (sortToIlist v)).
 
-  
-  (** *Comment this one*)
-  (* eapply CorrectDecoderEmpty. *)
-  
-  Corollary CorrectDecoderEmptyOptBool {S T}
-    : forall (monoid : Monoid T)
-             (Source_Predicate : S -> Prop)
-             (decode_inv : CacheDecode -> Prop)
-             (op : option S) (b: S-> bool),
-      (forall s', Ifopt op as s Then Source_Predicate s' -> s' = s Else True) ->
-      decidesOptBool op b Source_Predicate 
-      -> CorrectDecoder
-           monoid
-           Source_Predicate
-           Source_Predicate
-           eq
-           empty_Format
-           (filter_decode_bool op b)
-           decode_inv
-           empty_Format.
-  Admitted.
-  
   Corollary CorrectDecoderEmptyOpt {S T}
     : forall (monoid : Monoid T)
              (Source_Predicate : S -> Prop)
@@ -495,23 +942,6 @@ Section List2Ilist.
   Qed.
 
   
-  Lemma sortType_Permutation_inverse:
-    forall {n : nat}
-           {types : Vector.t Type n}
-           (ls : list (SumType types))
-           (ils : ilist types),
-      Permutation (ito_list ils) ls ->
-      sortType ls = Some ils.
-  Admitted.
-
-  
-  Lemma Permutation_sortType_inverse:
-    forall {n : nat}
-           {types : Vector.t Type n}
-           (ls : list (SumType types))
-           (ils : ilist types),
-      sortType ls = Some ils -> Permutation (ito_list ils) ls.
-  Admitted.
 
 
   Definition bothOpt {A: Type} (opt:option A) (b: A -> bool): option A:=
@@ -520,81 +950,36 @@ Section List2Ilist.
      | None   => None 
      end).
 
-  Lemma decidesOpt_and:
-    forall {A} (b: A -> bool) (opt: option A) (source_pred: Prop) (option_pred: A -> Prop),
-      (forall s, option_pred s -> General.decides (b s) source_pred) ->
-      decidesOpt opt option_pred -> 
-      decidesOpt (bothOpt opt b) (fun x => source_pred /\ option_pred x). 
-  Proof.
-    intros.
-    destruct opt eqn:Heqopt; simpl.
-    - destruct (b) eqn:Heqb; simpl.
-      + split; eauto.
-        eapply H in H0. rewrite Heqb in H0. assumption.
-      + intros s [? ?].
-        eapply H in H0.
-        rewrite Heqb in H0.
-        eauto.
-    - intros ? []; eauto.
-      eapply H0; eauto.
-  Qed.
-  
-  Lemma sort_list_SumType_Correct_Decoder:
-    forall n (types: Vector.t Type n) cache_inv v1 b source_pred,
-      CorrectDecoder ByteStringQueueMonoid (fun ils : ilist types => source_pred /\ Permutation (ito_list ils) v1)
-        (fun ils : ilist types => source_pred /\ Permutation (ito_list ils) v1) eq empty_Format 
-        (filter_decode  (bothOpt (sortType v1) b)) cache_inv empty_Format.
-  Proof.
-    intros.
-    eapply CorrectDecoderEmptyOpt; cycle 1.
-    - remember (fun ils => Permutation (ito_list ils) v1) as Blah.
-      assert (HH: (fun ils => source_pred /\ Permutation (ito_list ils) v1) = fun ils => source_pred /\  Blah ils).
-      { subst Blah; reflexivity. }
-      rewrite HH.
-      eapply decidesOpt_and.
-  Admitted.
-  (*
-    - intros.
-      destruct (sortType v1) eqn:HSTv1; simpl.
-      + intros [? Hperm].
-        clear - HSTv1 Hperm.
-        eapply sortType_Permutation_inverse in Hperm.
-        rewrite Hperm in HSTv1; inversion HSTv1; reflexivity.
-      + constructor.
-    - 
-            
-            
-      destruct (sortType v1) eqn:HSTv1; simpl.
-      + simpl.
-        eapply Permutation_sortType_inverse; auto.
-      + intros s Hs.
-        eapply sortType_Permutation_inverse in Hs. rewrite Hs in HSTv1; inversion HSTv1.
-  Qed.
-   *)
+  (** *sort_list_SumType_Correct_Decoder*)
+  (* This decoder for the `empty_Format` can untangle a permuted
+     list and lift it back into an ordered ilist.
 
-  Lemma sort_list_SumType_Correct_Decoder':
+     That is, map a `list (SumType types)` to an `ilist(B:=id) types`,
+     with possibility of failure if the initial list can't be strictly
+     ordered in the desired ilist, of the given length, without
+     repetition. *)
+
+  Lemma sort_list_SumType_Correct_Decoder:
     forall n (types: Vector.t Type n) cache_inv v1,
       CorrectDecoder ByteStringQueueMonoid (fun ils : ilist types => Permutation (ito_list ils) v1)
         (fun ils : ilist types => Permutation (ito_list ils) v1) eq empty_Format 
-        (filter_decode  (sortType v1)) cache_inv empty_Format.
+        (sort_filter v1) cache_inv empty_Format.
   Proof.
     intros.
     eapply CorrectDecoderEmptyOpt; cycle 1.
     - intros. 
-      destruct (sortType v1) eqn:HSTv1; simpl.
-      + apply Permutation_sortType_inverse; assumption.
+      destruct (sortToIlist v1) eqn:HSTv1; simpl.
+      + apply Permutation_sortToIlist_inverse; assumption.
       + intros ** ?.
-        eapply sortType_Permutation_inverse in H.
+        eapply sortToIlist_Permutation_inverse in H.
         rewrite H in HSTv1; discriminate.
-    - destruct (sortType v1) eqn:HSTv1; simpl; try tauto.
+    - destruct (sortToIlist v1) eqn:HSTv1; simpl; try tauto.
       intros.
-      eapply sortType_Permutation_inverse in H.
+      eapply sortToIlist_Permutation_inverse in H.
       rewrite H in HSTv1. inversion HSTv1; reflexivity.
   Qed.
 
-
-  
-End List2Ilist.
+End SortDecodeCorrect.
 
 
 
@@ -826,7 +1211,7 @@ Section ListPermutations.
           (constant True) (constant True)
           eq 
           (@permutation_ilist_Format m types fin_format formats)
-          (permutation_ilist_decoder fin_decoder decoders decode_filter)
+          (permutation_ilist_decoder fin_decoder decoders sort_filter)
           cache_inv
           (@permutation_ilist_Format m types fin_format formats).
   Proof.
@@ -847,8 +1232,7 @@ Section ListPermutations.
     - intros.
       eapply weaken_view_predicate_Proper; cycle 1.
       eapply weaken_source_pred_Proper; cycle 1.
-      eapply sort_list_SumType_Correct_Decoder'.
-      (* sort_list_SumType_Correct_Decoder *)
+      eapply sort_list_SumType_Correct_Decoder.
       
       unfold flip, pointwise_relation, impl; simpl; tauto.
       unfold flip, pointwise_relation, impl; simpl; tauto.
@@ -983,7 +1367,7 @@ Section ListPermutations.
           (constant True) (constant True)
           eq 
           (@permutation_ilist_Format m types fin_format formats)
-          (permutation_ilist_decoder fin_decoder decoders decode_filter)
+          (permutation_ilist_decoder fin_decoder decoders sort_filter)
           cache_inv
           (@permutation_ilist_Format m types fin_format formats).
   Proof.
@@ -1148,7 +1532,7 @@ Section ObjectPermutation.
           (@permutation_Format
              S m types projs fin_format formats
           )
-          (permutation_decoder fin_decoder decoders decode_filter decode_S)
+          (permutation_decoder fin_decoder decoders sort_filter decode_S)
           cache_inv
           (@permutation_Format
              S m types projs fin_format formats
@@ -1223,7 +1607,7 @@ Section ObjectPermutation.
           (@permutation_Format
              S m types projs (Format_Fin sz) formats
           )
-          (permutation_decoder (Fin_Decoder m0 sz) decoders decode_filter decode_S)
+          (permutation_decoder (Fin_Decoder m0 sz) decoders sort_filter decode_S)
           cache_inv
           (@permutation_Format
              S m types projs (Format_Fin sz) formats
@@ -1256,15 +1640,15 @@ Section ObjectPermutation.
 
   Definition AlignedSortList {m} {types: Vector.t Type (S m)}
       (b : list (SumType types)) (numBytes :nat): AlignedDecodeM _ numBytes:=
-    Ifopt sortType b as a' Then (return a')%AlignedDecodeM
+    Ifopt sortToIlist b as a' Then (return a')%AlignedDecodeM
                                  Else ThrowAlignedDecodeM.
     
   Lemma AlignedDecodeFilter:
     forall m (types: Vector.t Type (S m))
       (b : list (SumType types)) ,
-      DecodeMEquivAlignedDecodeM (decode_filter b) (AlignedSortList b).
+      DecodeMEquivAlignedDecodeM (sort_filter b) (AlignedSortList b).
   Proof.
-    unfold decode_filter, filter_decode.
+    unfold sort_filter, filter_decode.
     intros. eapply @AlignedDecode_ifopt.
     eapply Return_DecodeMEquivAlignedDecodeM. 
   Qed.
@@ -1329,7 +1713,7 @@ Section ObjectPermutation.
                               DecodeMEquivAlignedDecodeM (ith decoders idx)
                                 (ith aligned_decoders idx))),
       DecodeMEquivAlignedDecodeM
-        (permutation_decoder idx_decoder decoders decode_filter decode_S)
+        (permutation_decoder idx_decoder decoders sort_filter decode_S)
         (AlignedDecoderPermutation S idx_aligned_decoder aligned_decoders t).
   Proof.
     intros.
@@ -1368,7 +1752,7 @@ Section ObjectPermutation.
           addD (addD cd n0) m0 = addD cd (n0 + m0))
       (cache1: forall cd : CacheDecode, addD cd 0 = cd),
       DecodeMEquivAlignedDecodeM
-        (permutation_decoder (Fin_Decoder m (sz * 8)) decoders decode_filter decode_S)
+        (permutation_decoder (Fin_Decoder m (sz * 8)) decoders sort_filter decode_S)
         (AlignedDecoderPermutation S (IndexAligneDecoder m sz) aligned_decoders t).
   Proof.
     intros; eapply AlignedDecodePermutation; eauto; eapply @AlignedDecodeFin; assumption.
@@ -1393,7 +1777,7 @@ Section ObjectPermutation.
           addD (addD cd n0) m0 = addD cd (n0 + m0))
       (cache1: forall cd : CacheDecode, addD cd 0 = cd),
       DecodeMEquivAlignedDecodeM
-        (permutation_decoder (decode_enum codes) decoders decode_filter decode_S)
+        (permutation_decoder (decode_enum codes) decoders sort_filter decode_S)
         (AlignedDecoderPermutation S (Aligned_decode_enum codes) aligned_decoders t).
   Proof.
     intros; eapply AlignedDecodePermutation; eauto.
