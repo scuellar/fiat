@@ -12,7 +12,7 @@ Require Import
         Coq.Logic.FinFun.
 Import Fin2Restrict.
 
-Require Import Fiat.Narcissus.Formats.Derived.IndexedSumType.
+Require Import Fiat.Narcissus.Formats.IndexedSumType.
 
 Set Warnings "-local-declaration".
 Set Nested Proofs Allowed.

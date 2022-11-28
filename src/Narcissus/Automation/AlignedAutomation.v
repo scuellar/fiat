@@ -18,7 +18,7 @@ Require
         (*This library should probably go in the Binlib folder
           ... But there are circularity problems
          *)
-        Fiat.Narcissus.Formats.Derived.IndexedSumType.
+        Fiat.Narcissus.Formats.IndexedSumType.
 
 Require Import Bedrock.Word.
 

@@ -20,7 +20,7 @@ Require Import
   Fiat.Narcissus.Formats.FixListOpt
   Fiat.Narcissus.Formats.EnumOpt
   Fiat.Narcissus.Formats.Sequence
-  Fiat.Narcissus.Formats.Derived.IndexedSumType.
+  Fiat.Narcissus.Formats.IndexedSumType.
 Require Import
   Fiat.Common.List.ListFacts
   Fiat.Common.ilist.

@@ -3,7 +3,7 @@
 order. Just like in XML. *)
 Require Import Fiat.Narcissus.Examples.TutorialPrelude.
 Require Import Fiat.Narcissus.Formats.PermutationOpt.
-Require Import Fiat.Narcissus.Formats.Derived.IndexedSumType.
+Require Import Fiat.Narcissus.Formats.IndexedSumType.
 
 Require Import Coq.Sorting.Permutation.
 Require Import Fiat.Narcissus.Automation.Invertible.
