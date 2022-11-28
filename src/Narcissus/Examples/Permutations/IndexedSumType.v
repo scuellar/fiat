@@ -121,8 +121,11 @@ ltac:(start_synthesizing_decoder)
   Let encode := encoder_impl enc_dec.
   
   Let decode := decoder_impl enc_dec.
-    Print Assumptions decode.
-    
+  (* Print Assumptions decode.
+
+    Closed under the global contextClosed under the global context
+
+   *)
 End SumTypeCodes3.
 
 

@@ -95,8 +95,13 @@ Module SimplPermutation.
   Let encode := encoder_impl enc_dec.
   
   Let decode := decoder_impl enc_dec.
-  Print Assumptions enc_dec.
+  (*Print Assumptions enc_dec.
 
+   Axioms:
+     functional_extensionality_dep
+       : forall (A : Type) (B : A -> Type) (f g : forall x : A, B x), (forall x : A, f x = g x) -> f = g
+     JMeq_eq : forall (A : Type) (x y : A), x ~= y -> x = y
+  *)
 
 End SimplPermutation.
 
@@ -148,8 +153,6 @@ Module FourPermutation.
   Let encode := encoder_impl enc_dec.
   
   Let decode := decoder_impl enc_dec.
-  Print Assumptions decode.
-
   
 End FourPermutation.
 
