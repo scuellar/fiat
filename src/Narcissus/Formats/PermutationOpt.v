@@ -400,7 +400,7 @@ Section List2Ilist.
 
    *)
   
-  Definition lift_SumType (A:Type) {n:nat} {types:Vector.t Type n} :
+  Definition liftSumType (A:Type) {n:nat} {types:Vector.t Type n} :
     SumType types -> SumType (Vector.cons Type A _ types):=
     match types as typs return
           SumType typs -> SumType (Vector.cons Type A _ typs) with
@@ -411,6 +411,8 @@ Section List2Ilist.
     | Vector.cons a n typs' =>
         fun elem => inr elem
     end.
+  Definition liftListSumType {n types h}:= map (@liftSumType h n types).
+  
 
   (** *ito_list*)
   (** Maps an heterogeneous list into a homogeneous list of
@@ -426,7 +428,7 @@ Section List2Ilist.
         let typs:= Vector.cons Type a n' typs' in
         fun ils =>
           (inj_SumType typs Fin.F1 (prim_fst ils))
-            :: map (lift_SumType a) (ito_list (prim_snd ils))
+            :: liftListSumType (ito_list (prim_snd ils))
     end.
 
   (** *ifrom_list*)
@@ -506,13 +508,12 @@ Section List2Ilist.
   (* Like `traverse`, specialized to `list`s and `option` *)
   Fixpoint traverseOp {a b: Type} (f: a -> option b) (ls: list a): option (list b):=
     match ls with
-      [] => Some []
-    | hd::tl => match (f hd, traverseOp f tl) with
-              | (None, _) => None
-              | (_, None) => None
-              | (Some hd', Some tl') => Some (hd' :: tl')
-              end
-    end.
+    | [] => Some []
+    | hd::tl =>
+        hd' <- f hd;
+        tl' <- traverseOp f tl;
+        Some (hd' :: tl')
+  end.
 
   (* Take a list of `SumType`s and remove the frist type
             from the vector, if the list doesn't contain anything of
@@ -520,6 +521,70 @@ Section List2Ilist.
   Definition dropListSumType {n : nat} {types : Vector.t Type n} {A:Type}:
     list (SumType (Vector.cons _ A n types)) -> option (list (SumType types)):=
     traverseOp dropSumType.
+
+  
+  Lemma lift_dropSumType:
+    forall {n : nat} {types : Vector.t Type n} 
+      (A : Type) (el: SumType types) ,
+      dropSumType (liftSumType A el) = Some el.
+  Proof.
+    destruct types.
+    - intros. inversion el.
+    - intros. reflexivity.
+  Qed.
+  
+  Lemma lift_dropListSumType:
+    forall {n : nat} {types : Vector.t Type n} 
+      (A : Type) (ls_low : list (SumType types)),
+      dropListSumType(A:=A) (liftListSumType ls_low) = Some ls_low.
+  Proof.
+    intros.
+    induction ls_low.
+    - reflexivity.
+    - simpl.
+      unfold dropListSumType in *.
+      simpl. rewrite lift_dropSumType, IHls_low.
+      reflexivity.
+  Qed.
+
+  
+  Ltac caseBindOpt:=
+    match goal with
+    | [ H: BindOpt ?a ?b = _ |- _ ] =>
+        destruct a eqn:?; simpl in H; try congruence
+    end.
+  
+  
+  Lemma drop_liftSumType:
+    forall {n : nat} {types : Vector.t Type n} 
+      (h : Type) el_high el_low,
+      dropSumType el_high = Some el_low ->
+      @liftSumType h n types el_low = el_high.
+  Proof.
+    destruct types; simpl; intros.
+    - destruct el_low.
+    - destruct el_high; try congruence.
+      inversion H.
+      reflexivity.
+  Qed.
+
+  Lemma drop_liftListSumType:
+    forall {n : nat} {types : Vector.t Type n} 
+      (h : Type) (ls_high : list (SumType (Vector.cons Type h n types)))
+      (ls_low : list (SumType types)),
+      dropListSumType ls_high = Some ls_low ->
+      liftListSumType ls_low = ls_high.
+  Proof.
+    induction ls_high.
+    - intros; simpl in H. inversion H.
+      reflexivity.
+    - intros; unfold dropListSumType in H.
+      simpl in H.
+      do 2 caseBindOpt. inversion H; subst; clear H.
+      eapply IHls_high in Heqo0. simpl; rewrite Heqo0.
+      f_equal.
+      eapply drop_liftSumType; assumption.
+  Qed.
   
   Fixpoint ifrom_list {n:nat} {types:Vector.t Type n}
     {struct types}: list (SumType types) -> option (ilist (B:=id) types):=
@@ -556,7 +621,34 @@ Section List2Ilist.
       ifrom_list ls = Some ils ->
       ito_list ils = ls.
   Proof.
-  Admitted.
+    induction types.
+    - intros.
+      destruct ls.
+      + simpl in H.
+        inversion H; reflexivity.
+      + simpl in H. destruct s.
+    - intros ls; destruct ls as [| hd tl].
+      + simpl; congruence.
+      + simpl; intros.
+        do 2 caseBindOpt.
+        eapply IHtypes in Heqo0.
+        simpl; f_equal.
+        * destruct types.
+          -- simpl in *. subst.
+             inversion H; simpl.
+             simpl in tl.
+             destruct tl; auto.
+          -- clear -H.
+             unfold ilist_cons in H.
+             destruct hd; inversion H; reflexivity.
+        * assert (i = prim_snd ils) .
+          { unfold ilist_cons in *.
+            destruct types; try destruct hd; inversion H; subst; simpl;
+              reflexivity. }
+          subst i.
+          eapply drop_liftListSumType.
+          rewrite Heqo. f_equal; eauto.
+  Qed.
   
   Lemma ito_ifrom_list:
     forall {n : nat}
@@ -564,7 +656,14 @@ Section List2Ilist.
       (ils : ilist types),
       ifrom_list (ito_list ils) = Some ils.
   Proof.
-  Admitted.
+    induction types.
+    - destruct ils; reflexivity.
+    - destruct ils.
+      simpl.
+      rewrite lift_dropListSumType; simpl.
+      rewrite IHtypes; simpl.
+      destruct types; simpl; reflexivity.
+  Qed.
   
 End List2Ilist.
 
@@ -610,7 +709,7 @@ Section SortIlist.
     forall h {n : nat}
       {types : Vector.t Type n},
     forall (x y : SumType types),
-      SumTypeLt (lift_SumType h x) (lift_SumType h y) =
+      SumTypeLt (liftSumType h x) (liftSumType h y) =
         SumTypeLt x y.
   Proof.
     destruct types.
@@ -634,7 +733,7 @@ Section SortIlist.
   Lemma SumTypeLt_lift':
     forall h {n : nat}
       {types : Vector.t Type n},
-      (fun x y => is_true (SumTypeLt (lift_SumType h x) (lift_SumType h y))) =
+      (fun x y => is_true (SumTypeLt (liftSumType h x) (liftSumType h y))) =
         (fun x y => SumTypeLt(types:=types) x y).
   Proof.
     intros. extensionality x; extensionality y.
@@ -672,19 +771,28 @@ Section SortIlist.
                         -> Forall (fun b=> ~ (R a b) \/ ~ (R b a)) ls
                         -> allDifferent R (a::ls).
   
+  Ltac ForallLtac ls:=
+    induction ls;
+    [constructor 1 |
+      let HH := fresh
+      in intros HH; induction HH;
+         [ constructor 1 | constructor 2; auto] ].
+
+  Lemma Forall_map:
+    forall A B (g: A -> B) (f: B -> Prop) ls,
+      Forall (fun x => f (g x)) ls ->
+      Forall f (map g ls).
+  Proof. ForallLtac ls. Qed.
   Lemma allDifferent_map:
     forall A B (R:relation B) (f: A -> B) ls,
       allDifferent (fun x y => R (f x) (f y)) ls ->
       allDifferent R (map f ls).
-  Proof.
-  Admitted.
+  Proof. ForallLtac ls; apply Forall_map; eauto. Qed.
   Lemma StronglySorted_map:
     forall A B (R:relation B) (f: A -> B) ls,
       Sorted.StronglySorted (fun x y => R (f x) (f y)) ls ->
       Sorted.StronglySorted R (map f ls).
-  Proof.
-  Admitted.
-
+  Proof. ForallLtac ls; apply Forall_map; eauto. Qed.
   Lemma Permutation_Sorted_eq:
     forall A (R: relation A) (ls1 ls2 : list A)
       (* (Hantisym: antisymmetric _ R) *)
@@ -750,7 +858,7 @@ Section SortIlist.
            -- subst p.
               right. eapply SumTypeLt_inr_inl.
            -- match goal with
-                |- Forall ?p (map ?f1 ?ls) =>
+                |- Forall ?p (liftListSumType ?ls) =>
                   remember p as P; remember ls as LS
               end.
               clear - Heqp.
@@ -787,7 +895,7 @@ Section SortIlist.
           -- subst p.
              eapply SumTypeLt_inl_inr.
           -- match goal with
-               |- Forall ?p (map ?f1 ?ls) =>
+               |- Forall ?p (liftListSumType ?ls) =>
                  remember p as P; remember ls as LS
              end.
              clear - Heqp.
@@ -1140,7 +1248,7 @@ Section ListPermutations.
     intros ??; induction types.
     - intros. reflexivity.
     - intros. simpl.
-      f_equal; rewrite map_length.
+      f_equal. unfold liftListSumType; rewrite map_length.
       eapply IHtypes.
   Qed.
   
@@ -1243,7 +1351,7 @@ Section ListPermutations.
 
   Lemma SumType_index_lift:
     forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
-      (SumType_index (Vector.cons Type h n types) (lift_SumType h y)) =
+      (SumType_index (Vector.cons Type h n types) (liftSumType h y)) =
         Fin.FS (SumType_index types y).
   Proof.
     destruct types.
@@ -1254,7 +1362,7 @@ Section ListPermutations.
   Lemma SumType_proj_lift:
     forall n (types : Vector.t Type n) (h: Type) (y : SumType types),
       let types':= (Vector.cons Type h n types) in
-      SumType_proj types y ~= SumType_proj types' (lift_SumType h y).
+      SumType_proj types y ~= SumType_proj types' (liftSumType h y).
   Proof.
     destruct types.
     - intros. elim y.
@@ -1297,7 +1405,7 @@ Section ListPermutations.
                  forall n (types : Vector.t Type n) (h: Type) (y : SumType types) ,
                    let types':= (Vector.cons Type h n types) in
                    forall  (ils: ilist(B:=id) types'),
-                     ith ils (SumType_index types' (lift_SumType h y)) ~=
+                     ith ils (SumType_index types' (liftSumType h y)) ~=
                        ith ils (Fin.FS (SumType_index types y))).
         {
           clear; intros.
