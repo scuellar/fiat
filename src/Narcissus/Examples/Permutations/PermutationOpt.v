@@ -2,7 +2,6 @@
 (* This format allows to encode a record, writting it's fields in any
 order. Just like in XML. *)
 Require Import Fiat.Narcissus.Examples.TutorialPrelude.
-Require Import Fiat.Narcissus.Formats.Reorder.
 Require Import Fiat.Narcissus.Formats.PermutationOpt.
 Require Import Fiat.Narcissus.Formats.Derived.IndexedSumType.
 

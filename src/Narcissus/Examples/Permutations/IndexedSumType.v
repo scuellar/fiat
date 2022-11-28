@@ -1,6 +1,5 @@
 
 Require Import Fiat.Narcissus.Examples.TutorialPrelude.
-Require Import Fiat.Narcissus.Formats.Reorder.
 Require Import 
         Coq.Sorting.Permutation.
 Require Import Fiat.Narcissus.Automation.Invertible.
