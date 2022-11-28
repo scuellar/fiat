@@ -291,6 +291,9 @@ src/Narcissus/Examples/NetworkStack/Microbenchmarks.v
 src/Narcissus/Examples/NetworkStack/TCP_Packet.v
 src/Narcissus/Examples/NetworkStack/TestInfrastructure.v
 src/Narcissus/Examples/NetworkStack/UDP_Packet.v
+src/Narcissus/Examples/Permutations/IndexedSumType.v
+src/Narcissus/Examples/Permutations/Invertible.v
+src/Narcissus/Examples/Permutations/PermutationOpt.v
 src/Narcissus/Formats/ASN1.v
 src/Narcissus/Formats/AsciiOpt.v
 src/Narcissus/Formats/Bool.v
