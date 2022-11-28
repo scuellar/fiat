@@ -382,7 +382,7 @@ Ltac split_iterate:=
 
 (*+ Vector util *)
 (* We provide aditional functionality for working with vectors.
-   Santiago: I'm surprised none of these is in the standard libraryor Fiat. Did I miss them? *)
+   Santiago: I'm surprised none of these is in the standard library or Fiat. Did I miss them? *)
 Section Vector.
   Context {T: Type}.
   Context (code_dec: forall (x y: T), {x = y} + {x <> y}). (* Decidable equality*)
