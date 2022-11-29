@@ -138,6 +138,27 @@ Proof.
     apply H0.
 Qed.
 
+(* Lemma for normalization. Projections and composition can be merged. *)
+  Lemma EquivFormat_compose_projection {S' S''}
+    (format_S'' : FormatM S'' T)
+    (f : S -> S')
+    (r : S' -> S'' -> Prop)
+    : EquivFormat (Projection_Format (Compose_Format format_S'' r) f)
+        (Compose_Format format_S'' (fun a b => r (f a) b)).
+  Proof.
+    unfold EquivFormat, refineEquiv, Projection_Format, Compose_Format, compose, Bind2; split;
+      intros ? ?.
+    - rewrite unfold_computes in *.
+      destruct_ex; split_and; eexists.
+      rewrite unfold_computes;  eauto.
+    - rewrite unfold_computes in *.
+      destruct_ex; split_and.
+      rewrite unfold_computes in H0.
+      destruct_ex; split_and.
+      eexists; intuition eauto.
+      subst; eauto.
+  Qed.
+
 Lemma EquivFormat_UnderSequence'
   : forall (format1 format1' format2 format2' : FormatM S T),
     EquivFormat format1 format1'

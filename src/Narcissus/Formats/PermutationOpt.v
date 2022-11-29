@@ -1123,36 +1123,6 @@ Section ListPermutations.
       subst; eauto.
   Qed.
   
-  Ltac normalize_step BitStringT ::=
-    (first
-       [ match goal with
-         | |- EquivFormat ?z ?x => is_evar z; apply EquivFormat_reflexive
-         end; idtac "1"
-       | eapply EquivFormat_trans; [ apply sequence_assoc |  ]
-         ; idtac "3"
-       | eapply EquivFormat_trans;
-         [ apply sequence_mempty with (monoid := BitStringT) |  ]
-         ; idtac "5"
-       | eapply EquivFormat_ComposeIf; intros
-         ; idtac "6"
-       | eapply EquivFormat_trans;
-         [ apply EquivFormat_If_Then_Else with (monoid := BitStringT) |  ]
-         ; idtac "8"
-       | apply EquivFormat_If_Then_Else_Proper
-         ; idtac "9"
-       | eapply EquivFormat_UnderSequence';
-         [ repeat
-             (eapply EquivFormat_trans;
-              [ first [eapply EquivFormat_compose_map; idtac "10.0" |
-                        eapply EquivFormat_compose_projection; idtac "10.1" ] |  ] );
-           apply EquivFormat_reflexive
-         |  ] ; idtac "10"
-       | eapply EquivFormat_Projection_Format_Empty_Format';
-         [ repeat eapply EquivFormat_compose_map;
-           apply EquivFormat_reflexive ] ; idtac "11"
-       | unfold EquivFormat; intros; reflexivity ]); 
-    intros.
-  
   (** *The Format*)
   
   (* | Adds a type to the type of a SumType. Doesn't change the element.

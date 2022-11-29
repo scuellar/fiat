@@ -49,7 +49,9 @@ Ltac normalize_step BitStringT :=
      | eapply EquivFormat_trans; [ apply EquivFormat_If_Then_Else with (monoid := BitStringT) |  ]
      | apply EquivFormat_If_Then_Else_Proper
      | eapply EquivFormat_UnderSequence';
-       [ repeat (eapply EquivFormat_trans; [ eapply EquivFormat_compose_map |  ]); apply EquivFormat_reflexive
+       [ repeat (eapply EquivFormat_trans;
+                 [ first [eapply EquivFormat_compose_map| eapply EquivFormat_compose_projection]
+                 |  ]); apply EquivFormat_reflexive
        |  ]
      | eapply EquivFormat_Projection_Format_Empty_Format';
        [ repeat eapply EquivFormat_compose_map; apply EquivFormat_reflexive ]
