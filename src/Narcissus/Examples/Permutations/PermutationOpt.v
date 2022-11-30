@@ -65,10 +65,6 @@ Module SimplPermutation.
   
   Let myFormat := False .
 
-  Ltac new_encoder_rules ::=
-    eapply Permutation_Encoder_Correct;
-    [| unfold Vector.nth; repeat constructor | |IndexedSumType.split_iterate ]; simpl;
-    eauto with resilience.
   Definition inv (msg: message):= True.
 
   
@@ -131,11 +127,6 @@ Module FourPermutation.
   Let myFormats: ilist (B := fun T => FormatM T ByteString) (myTypes myProjections)
       := {{ format_word; format_word; format_word; format_word }}.
   
-  Ltac new_encoder_rules ::=
-    eapply Permutation_Encoder_Correct;
-    [| unfold Vector.nth; repeat constructor | |IndexedSumType.split_iterate ]; simpl;
-    eauto with resilience.
-
   Definition inv (msg: message):= True.
 
   Definition myFormat:= permutation_Format myProjections myFinFormat myFormats.
@@ -184,11 +175,6 @@ Module AllEqualPermutation.
   Let myFormats: ilist (B := fun T => FormatM T ByteString) (myTypes myProjections)
       := {{ format_word; format_word; format_word; format_word }}.
   
-  Ltac new_encoder_rules ::=
-    eapply Permutation_Encoder_Correct;
-    [| unfold Vector.nth; repeat constructor | |IndexedSumType.split_iterate ]; simpl;
-    eauto with resilience.
-
   Definition inv (msg: message):= True.
 
   Definition myFormat:= permutation_Format myProjections myFinFormat myFormats.

@@ -10,6 +10,7 @@ Require Import
         Fiat.Narcissus.Common.ComposeIf
         Fiat.Narcissus.Formats
         Fiat.Narcissus.Formats.StringOpt
+        Fiat.Narcissus.Formats.PermutationOpt
         Fiat.Narcissus.BaseFormats
         Fiat.Narcissus.Automation.Solver
         Fiat.Narcissus.Automation.NormalizeFormats.
@@ -696,6 +697,10 @@ Ltac align_encoder_step :=
       | eexists; reflexivity ]
     end
   | new_encoder_rules
+  (* Permutation *)      
+  | eapply Permutation_Encoder_Correct;
+    [| unfold Vector.nth; repeat constructor | |IndexedSumType.split_iterate ]; simpl;
+    eauto with resilience
   | eapply IndexedSumType.IndexedSumType_Encoder_Correct;
           [ IndexedSumType.split_iterate | ]
   | eapply CorrectAlignedEncoderForFormatDelimiter; [
