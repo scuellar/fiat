@@ -36,23 +36,51 @@ Definition ituple {n} tys: Type:= @ilist _ id n tys.
  *)
 
 Module SimplPermutation.
-  (* Simple permutation of two elements, indexed by a code/label *)
+  (* Simple permutation of two elements, indexed by a code/label*)
 
+   (*   ## From last time
+
+     Format_through_list: FormatM S ByteString :=
+       (format_list format_IndexedSumType) ◦ ito_list ◦ iapp projections
+     *)(*
+
+     Encoding: 
+      S --(iapp projections)--> ilist --(ito_list)--> list --(encode)--> ByteString   
+     *)(*
+     Decoding: 
+      ByteString --(decode)--> list --(ifrom_list)--> ilist --(ExtractView)--> S
+    *)
+
+    (* ## Permutation `permutation_Format`
+
+     permutation_Format: FormatM S ByteString :=
+       (format_list format_IndexedSumType) ◦◦ Permutation ◦ ito_list ◦ iapp projections
+     *)(*
+
+     Encoding: 
+      S --(iapp projections)--> ilist --(ito_list)--> list --(encode)--> ByteString   
+     *)(*
+     Decoding: 
+      ByteString --(decode)--> list --(sort)--> sorted list --(ifrom_list)--> ilist --(ExtractView)--> S
+    *)
+   
+
+  
+  Record message := {
+      label : word 8
+    ; data : word 16                     
+    }.
   
   Let types:= [word 8:Type; word 16:Type].
 
   Definition formats : ilist (B := fun T => FormatM T ByteString) types
     := {{ format_word; format_word }}.
-  
+   
   Let invariants := ilist_constant_T types.
   Let view_fin {n} (f:Fin.t n):= f2n f < pow2 8.
   Let invariant := (fun st : SumType types =>
                       view_fin (SumType_index types st) /\ ith invariants (SumType_index types st) (SumType_proj types st)).
 
-  Record message := {
-      label : word 8
-    ; data : word 16                     
-    }.
 
   Let myProjections: ilist (B:=fun T => _ -> T) types := {{ label ; data }}.
   Let myTypes {n: nat} {types: Vector.t Type n} {B} (list: ilist (B:=B) types): Vector.t Type n:= types.
@@ -71,17 +99,7 @@ Module SimplPermutation.
   Let enc_dec : EncoderDecoderPair (permutation_Format myProjections myFinFormat myFormats) inv.
   Proof.
     unfold myFormat, myFinFormat.
-    (* derive_encoder_decoder_pair. *)
-    econstructor;
-      [ synthesize_aligned_encoder |  ].
-
-   (* synthesize_aligned_decoder. *)
-   start_synthesizing_decoder.
-   - normalize_format. apply_rules.
-   - cbv beta; synthesize_cache_invariant.
-   - cbv beta; unfold decode_nat, sequence_Decode;
-    optimize_decoder_impl.
-   - cbv beta; align_decoders.
+    derive_encoder_decoder_pair.
      
     Unshelve.
     constructor.
